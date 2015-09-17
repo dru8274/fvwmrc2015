@@ -1,0 +1,38 @@
+
+DestroyModuleConfig Disks: *
+DestroyModuleConfig Disks: *
+*Disks: Geometry 248x170
+*Disks: Columns 248
+*Disks: Rows 170
+*Disks: Padding 0 0
+*Disks: BoxSize fixed
+*Disks: Frame 0
+*Disks: Pixmap term-tile.png
+*Disks: (248x170, Id pic5, Icon diskpies.png )
+
+DestroyStyle Disks
+Style Disks StartsOnDesk 2, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Disks PositionPlacement 20p 254p, InitialMapCommand Move 20p 254p
+Style Disks !Button 1, !Button 2, !Button 4, !Button 6
+
+KillModule FvwmButtons Disks
+Module FvwmButtons Disks
+Schedule Periodic 60000 128761 Module DiskPie
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

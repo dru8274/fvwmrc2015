@@ -1,0 +1,18 @@
+
+DestroyModuleConfig FvwmAnimate: *
+*FvwmAnimate: Effect Frame
+*FvwmAnimate: Iterations 32
+*FvwmAnimate: Width 2
+*FvwmAnimate: Twist 0.500000
+*FvwmAnimate: Delay 10
+
+Module FvwmAnimate
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,50 @@
+
+Colorset 50 fg grey30, TiledPixmap term-tile.png
+#Colorset 50 fg "#6A96A6", TiledPixmap term-tile.png
+
+##  fg - colors the separation lines between the mini-desktops
+##  bg - background color behind the mini-windows. Use TiledPixmap instead.
+##  sh + hi ???
+
+#Colorset 51  sh grey50, hi grey50, TiledPixmap dark-brushstrokes--400x200.png
+#Colorset 51  sh "#3F6E80", hi "#3F6E80", TiledPixmap dark-brushstrokes--400x200.png
+Colorset 51  sh "#667880", hi "#667880", TiledPixmap dark-brushstrokes--400x200.png
+##  fg    - ???
+##  bg    - background color for inside mini-windows. Use TiledPixmap instead.
+##  sh+hi - the border around the mini-window
+
+DestroyModuleConfig FvwmPager: *
+*FvwmPager: Geometry 249x200
+*FvwmPager: Rows 3
+*FvwmPager: Columns 2
+*FvwmPager: Font none
+*FvwmPager: SmallFont none
+*FvwmPager: MoveThreshold 5
+*FvwmPager: NoDeskHilight
+*FvwmPager: Window3DBorders
+*FvwmPager: WindowBorderWidth 1
+*FvwmPager: Colorset * 50
+*FvwmPager: WindowColorsets 51 51
+*FvwmPager: Label 1 Pager
+*FvwmPager: Label 2 Pager
+*FvwmPager: Label 3 Pager
+*FvwmPager: Label 4 Pager
+*FvwmPager: Label 5 Pager
+*FvwmPager: Label 6 Pager
+
+DestroyStyle FvwmPager
+Style FvwmPager StartsOnDesk 2, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style FvwmPager PositionPlacement 20p 20p, InitialMapCommand Move 20p 20p
+Style FvwmPager !Button 1, !Button 2, !Button 4, !Button 6
+
+KillModule FvwmPager 1 6
+Schedule 500 Module FvwmPager 1 6
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,145 @@
+#!/usr/bin/perl
+
+use strict ;
+use warnings ;
+use v5.18 ;
+
+use lib `fvwm-perllib dir`;
+use FVWM::Module;
+use Sys::Statistics::Linux ;
+use Math::Round qw( round ) ;
+#use Data::Dump qw( dump ) ;
+
+my $lxs = Sys::Statistics::Linux->new(
+    cpustats  => 1,
+    memstats  => 1,
+    diskstats => 1,
+    netstats  => 1,
+    ) ;
+
+$lxs->init ;
+
+my $cpudiv = 2 ;
+my $cpusum = my $cpucnt = 0 ;
+my @graphdata = (0) x 20 ;
+my @desks = ( 
+    "zero ", " one ", " two ", "three", "four ",
+    "five ", " six ", "seven", "eight", "nine ",
+) ;
+my @mnths = qw( Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec ) ;
+my @cmds = () ;
+
+my $module = new FVWM::Module(
+    Name => 'FBBarStats',
+    Debug => 0,
+    );
+
+my $page_tracker = $module->track("PageInfo") ;
+$module->addHandler(M_STRING, \&update_bar) ;
+$module->event_loop ;
+
+
+####  SUBROUTINES
+
+sub update_bar  {
+
+    my $page_hash = $page_tracker->data ;
+    my $curr_desk = $page_hash->{'desk_n'} ;
+    my $desk = $desks[$curr_desk] ;
+
+    my $stats = $lxs->get ;
+
+    my $cpu = round($stats->{cpustats}->{cpu}->{total}) ;
+    $cpu = 99 if $cpu == 100 ;
+    $cpusum += $cpu ;
+    $cpucnt++ ;
+
+    my $swapused = round($stats->{memstats}->{swapused}/1024) ;
+    my $memtotal = $stats->{memstats}->{memtotal} ;
+    my $memused = round(
+        ($memtotal - $stats->{memstats}->{realfree})/1024
+    ) ;
+
+    my $netrx = round($stats->{netstats}->{wlan0}->{rxbyt}/1024) ;
+    $netrx = $netrx < 1000                ? 
+        sprintf "%4dKB/s", $netrx         :
+        sprintf "%4.2fMB/s", $netrx/1024  ;
+
+    my $nettx = round($stats->{netstats}->{wlan0}->{txbyt}/1024) ;
+    $nettx = $nettx < 1000                ? 
+        sprintf "%4dKB/s", $nettx         :
+        sprintf "%4.2fMB/s", $nettx/1024  ;
+
+    my ( $sec, $min, $hr, $mday, $mnth, $foo ) = localtime() ;
+    my $padsec = sprintf "%02d", ${sec} ;
+    my $date = "$mday ".$mnths[$mnth] ;
+    my $hrsmins = sprintf "%02d:%02d:", $hr, $min ;
+
+    addcmd("SendToModule FBBar ChangeButton z1 Title \"${desk}\"") ;
+    addcmd("SendToModule FBBar ChangeButton z3 Title ${cpu}%") ;
+    addcmd("SendToModule FBBar ChangeButton z4 Title ${memused}Mb") ;
+    addcmd("SendToModule FBBar ChangeButton z5 Title ${swapused}Mb") ;
+    addcmd("SendToModule FBBar ChangeButton z6 Title ${netrx}") ;
+    addcmd("SendToModule FBBar ChangeButton z7 Title ${nettx}") ;
+    addcmd("SendToModule FBBar ChangeButton z10 Title $padsec") ;
+
+    if ($sec%$cpudiv == 0) {
+
+        my $cpuavg = $cpusum/$cpucnt ;
+        pop @graphdata ;
+        unshift(@graphdata, int($cpuavg/16.6667)) ;
+
+        addcmd("SendToModule FBBar ChangeButton g1 Icon " . 
+            join("", @graphdata[0..3]).".xbm" ) ;
+        addcmd("SendToModule FBBar ChangeButton g2 Icon " . 
+            join("", @graphdata[4..7]).".xbm" ) ;
+        addcmd("SendToModule FBBar ChangeButton g3 Icon " . 
+            join("", @graphdata[8..11]).".xbm" ) ;
+        addcmd("SendToModule FBBar ChangeButton g4 Icon " . 
+            join("", @graphdata[12..15]).".xbm" ) ;
+        addcmd("SendToModule FBBar ChangeButton g5 Icon " . 
+            join("", @graphdata[16..19]).".xbm" ) ;
+
+        $cpucnt = 0 ;
+        $cpusum = 0 ;
+    }
+
+    if ($sec%60 == 0) {
+        my $celcius = round(readpipe("cat /sys/bus/acpi/devices/LNXTHERM\:00/thermal_zone/temp")/1000) ;
+
+        addcmd("SendToModule FBBar ChangeButton z2 Title ${celcius}") ;
+        addcmd("SendToModule FBBar ChangeButton z8 Title \"${date}\"") ;
+        addcmd("SendToModule FBBar ChangeButton z9 Title ${hrsmins}") ;
+    } ;
+
+    sendcmds() ;
+}
+
+sub addcmd   { push @cmds, $_[0] } ;
+
+sub sendcmds {
+    foreach (@cmds) { $module->send($_) } ;
+    @cmds = () ;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

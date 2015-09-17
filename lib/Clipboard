@@ -1,0 +1,407 @@
+#!/usr/bin/perl
+
+##  A WORKING SCRIPT IN PROGRESS
+##  /home/nostromo/temp-fvwmperl/stub5.pl
+
+use utf8 ;
+use strict ;
+use warnings ;
+use feature qw(say) ;
+#use diagnostics ;
+#use splain ;
+#use common::sense 
+
+use lib `fvwm-perllib dir`;
+use FVWM::Module;
+use Data::Dump qw( dump ) ;
+##  use General::Parse ;
+use IPC::Run qw( run ) ;
+
+my $module = new FVWM::Module(
+    Name => 'Clipboard',
+    Mask => M_CONFIG_INFO | M_END_CONFIG_INFO | M_STRING,
+    Debug => 0,
+    );
+
+my $modname = $module->name ;
+my $max_records = 20 ;
+my $max_chars   = 35 ;
+my @records = () ;
+my $menu_title = "FVWM Clipboard" ;
+my $xbuffer = "clipboard" ;
+
+my %funcs = ( youtube => undef, link  => undef, html  => undef, 
+              video   => undef, audio => undef, image => undef,
+              pdf     => undef, file => undef,  unknown => undef,
+            ) ;
+
+my %icons  = ( youtube => undef, link  => undef, html    => undef, 
+               video   => undef, audio => undef, image   => undef,
+               pdf     => undef, file  => undef, unknown => undef,
+               clear_history => undef, ) ;
+
+##  unshift @records, new_record("piccy.jpeg") ;
+##  unshift @records, new_record("http://steak.pie") ;
+##  unshift @records, new_record("http://youtube./bugger") ;
+#unshift @records, new_record("/etc/fstab") ;
+unshift @records, new_record("-") ;
+##  dump \@records ;
+#say "================ ";
+#dump $records[0] ;
+
+
+# set up signal handlers
+
+$module->addHandler(M_CONFIG_INFO, \&read_config);
+$module->addHandler(M_END_CONFIG_INFO, sub {
+        $module->show_message("[$modname] read config finished]") ;
+        $module->addHandler(M_STRING, \&process_cmd);
+        });
+    
+##  An infinite loop to monitor FVWM events.
+$module->show_message("starting ".$module->name);
+$module->send("Send_ConfigInfo");
+$module->event_loop ;
+
+sub read_config {
+    my ($module, $event) = @_;
+    return unless $event->_text =~ /^\*$modname(.*)$/;
+    process_config($1);
+}
+
+sub process_config {
+    my ($s) = @_;
+    my ($option, $args)= $s =~/\s*(\w+)\s*(.*)/;
+
+    my %opts = (
+        Records_Max        => sub { $max_records = $args },
+        Menu_Chars_Max     => sub { $max_chars = $args },
+        Menu_Title         => sub { $menu_title = $args  },
+        XBuffer            => sub { $xbuffer = $args },
+        Icon_Youtube_Link  => sub { $icons{youtube} = $args },
+        Icon_Other_Link    => sub { $icons{link} = $args },
+        Icon_Html_File     => sub { $icons{html} = $args },
+        Icon_Video_File    => sub { $icons{video} = $args },
+        Icon_Audio_File    => sub { $icons{audio} = $args },
+        Icon_PDF_File      => sub { $icons{pdf} = $args },
+        Icon_Image_File    => sub { $icons{image} = $args },
+        Icon_Other_File    => sub { $icons{file} = $args },
+        Icon_Unknown       => sub { $icons{unknown} = $args },
+        Icon_Clear_History => sub { $icons{clear_history} = $args },
+        Func_Youtube_Link  => sub { $funcs{youtube} = $args }, 
+        Func_Other_Link    => sub { $funcs{link} = $args },
+        Func_Html_File     => sub { $funcs{html} = $args },
+        Func_Video_File    => sub { $funcs{video} = $args },
+        Func_Audio_File    => sub { $funcs{audio} = $args },
+        Func_PDF_File      => sub { $funcs{pdf} = $args },
+        Func_Image_File    => sub { $funcs{image} = $args },
+        Func_Other_File    => sub { $funcs{file} = $args },
+        Func_Unknown       => sub { $funcs{unknown} = $args }, 
+    ) ;
+
+    if (defined $opts{$option}) {
+        $opts{$option}() ;
+    } else {
+        $module->showMessage("Unknown option \"$option\"");
+    }
+}
+
+sub process_cmd {
+
+    my ($module, $event) = @_ ;
+    my ($porkpie) = $event->_text ;
+    my ($command, $arg) = $porkpie =~ /\s*(\w+)\s*(.*)/ ;
+
+    my %cmd = (
+        sync    => sub { cb_sync() },
+        dump    => sub { cb_dump() },
+        clear   => sub { clear_history() },
+        menu    => sub { cb_menu() },
+        copy    => sub { xselcopy($arg) },
+    ) ;
+
+    if (defined $cmd{$command}) {
+        $cmd{$command}() ;
+        ##  $module->showMessage("debug: $command");
+    } else {
+        $module->showMessage("unknown command \"$command\"");
+    }
+}
+
+sub cb_dump { dump \@records }
+
+sub clear_history {
+    @records = () ; 
+    unshift @records, new_record("-") ;
+}
+
+sub cb_sync {
+
+    chomp(my $current = `timeout 0.5 xsel -o -b`) ;
+
+    if (defined($current) and $current ne $records[0]->{data}
+            and $current !~ /^\s*$/ )  {
+        for (my $idx = $#records ; $idx >= 0 ; $idx--)  {
+            if ($records[$idx]->{data} eq $current) { 
+                delete_record($idx) 
+            }
+        }
+        unshift @records, new_record($current) ;
+        delete_record($max_records) if exists $records[$max_records] ;
+
+        my $func = $records[0]->{func} ;
+        if ( defined $func )  {
+            my $x = $func . ' "' . $current . '"' ;
+            $module->send($x) ; 
+        }
+
+##        dump $records[0] ;
+##        say "-------------" ;
+    }
+} 
+
+sub new_record  {
+
+    my $data = shift ;
+    my ($label, $icon, $func, $type) = (undef, undef, undef, undef) ;
+
+    if ($data =~ /\n./)  {
+
+        # multiline
+        $type = "unknown" ;
+        $label = $data ;
+        for ($label)  {
+            s/\n/ /g  ;
+            s/\s+/ /g ;
+            s/^\s*//  ;
+        }
+        $label = substr $label, 0, $max_chars ; 
+        say "label : $label" ;
+
+    } elsif ($data =~ m{^http[s]?://(www.youtu.*)$} or
+             $data =~ m{^http[s]?://(youtu.*)$} )      {
+
+        # youtube url (single line)
+        $type = "youtube" ;
+        $label = substr $1, 0, $max_chars ;
+
+    } elsif ($data =~ m{^http[s]?://(\w.*)$} )  {
+
+        ##  other url (single line)
+        $type = "link" ;
+        $label = substr $1, 0, $max_chars ;
+
+    } elsif ($data !~ m{^/} or  not -e $data) {
+
+        ##  Single line, but not a filename
+        $type  =  "unknown" ;
+        $label =  $data ;
+        $label =~ s/\s+/ /g ;
+        $label =~ s/^\s*//  ;
+        $label =  substr $label, 0, $max_chars ; 
+
+    } else {
+
+        ## single line, and known to be a file
+        $label = abbrev_path($data) ;
+
+        my %filetypes = (
+            "video" => '[.](flv|mkv|mp4|mpe?g|avi|webm|wmv|mov)$',
+            "audio" => '[.](mp3|m4a|aac|ac3|flac|wav)$',
+            "image" => '[.](jpg|jpeg|png|gif)$',
+            "pdf"   => '[.]pdf$',
+            "html"  => '[.](html|htm|maff)$',
+        ) ;
+
+        foreach my $x (keys %filetypes) {
+            my $pat = $filetypes{$x} ;
+            if ($data =~ /$pat/ )  { $type = $x }
+        }
+
+        $type = "file" if (not defined $type) ;
+    }
+
+    $func = $funcs{$type} if defined $funcs{$type} ;
+    $icon = $icons{$type} if defined $icons{$type} ;
+
+    ##  ensure that $label has length of $max_chars 
+#    my $num = $max_chars - length($label) ;
+#    $label .= " " x $num if $num > 0 ;
+
+    say "-----------------"  ;
+    say "*** label : $label" ;
+    say "*** type  : $type " ;
+    say "*** icon  : $icon " if defined $icon ;
+    say "*** func  : $func " if defined $func ;
+
+    ##  Return new record as a hashref.
+    return { data => $data,  label => $label,  
+             icon => $icon,  func  => $func   } ;
+}
+
+sub delete_record  {
+    my $idx = shift ;
+    foreach (keys %{ $records[$idx] } ) { delete $records[$idx]->{$_} }
+    splice @records, $idx, 1 ;
+}
+
+sub abbrev_path  {
+
+    my $name = shift ;
+    
+    while ( length($name) > $max_chars and
+            $name =~ s!/([^/])[^/]+/!/$1/! ) { }
+
+    my $num = length($name) - $max_chars ;
+    $name = "..." . substr($name, $num+3) if $num > 0 ;
+    return $name ;
+}
+
+sub cb_menu {
+
+    ##  Define a clipboard menu with entries from the history file.
+    my @cmds = (
+       "DestroyMenu ClipMenu",
+       'AddToMenu ClipMenu "FVWM Clipboard" Title '
+    ) ;
+
+
+    ##  One menu entry for each item in @records.
+    for (my $idx = 0 ; $idx <= $#records ; $idx++)  { 
+        my $r = $records[$idx] ;
+        my $icon = defined $r->{icon} ? "%" . $r->{icon} . "%" : "" ;
+        my $cmnd = '+ "' . $icon . $r->{label} . '" ' ; 
+        $cmnd .= "SendToModule $modname copy ".$idx ;
+        push @cmds, $cmnd ;  
+    }
+
+    ##  Divider line.
+    push @cmds, '+ "" Nop' ;
+
+    ##  Clear history entry.
+    my $cmnd = '+ "%' . $icons{clear_history} . "%Clear history" . '" ' ;
+    $cmnd   .= "SendToModule $modname clear " ;
+    push @cmds, $cmnd ;  
+
+    ## Move the cursor aside, and open the clipboard menu.
+    push @cmds, ( "WindowId root  WarpToWindow 50 10",
+                    "Menu ClipMenu Root c c Nop" ) ;
+    
+    ##  Run the stored FVWM commands.
+    foreach (@cmds) { $module->send($_) } ; 
+}
+
+sub xselcopy  {
+    my $idx = shift ;
+    system( qw( pkill xsel ) ) ;
+    my @cmd = qw( xsel -ib ) ;
+    my $out = my $err = "" ;
+    my $data = $records[$idx]->{data} ;
+    run \@cmd, \$data, \$out, \$err ;
+}
+
+
+
+
+
+
+
+##    say "---------|---------|---------|---------|---------|" ;
+##    say $name ;
+
+
+
+##  say abbrev_path("/home/nostromo/Documents/002-Linux--topics/000-myApps-4-Linux/002-Desktop-Text-Editors--Gedit--Geany--Nedit--SublimeText2--Scribes--Jedit/001-Scribus/scribus--desktop-publishing--howto-make-a-birthday-card-for-Mom--Carla_Schroder--Linux.com.maff") ;
+##  say abbrev_path("/root/wifi_on.sh");
+##  say abbrev_path("/home/nostromo/old-fontconfig.tar.bz2") ;
+##  say abbrev_path("/home/nostromo/Downloads/000--Httrackx/MLG_Dallas/tubeget.sh") ;
+##  say abbrev_path("/home/nostromo/Downloads/000--Httrackx/MLG_Dallas/John Key responds to 'Dirty Politics'.mp4") ;
+##  say abbrev_path("/home/nostromo/Downloads/000--Httrackx/Wallpapers/016-Apod/040-Central-IC-1805.jpg") ;
+
+
+##  say "xxx" . $ARGV[0] ; 
+
+##  my $x = mimetype($ARGV[0]) ;
+##  say "--> $x <--" if defined $x ;
+##  
+##  $x = mimetype($ARGV[0]) ;
+##  $x =~  s/\/.*// ;
+##  $x = "html" if $ARGV[0] =~ /[.]maff$/ ; 
+##  say "--> $x <--" if defined $x ;
+
+##  get_type("http://start.com/blah.fuck.index.html") ;
+##  get_type("https://youtube.com/ghjk") ;
+##  get_type("https://that.is.crap/fuck.you.donkey.html") ;
+##  get_type("blah.mp4") ;
+##  get_type("sexy.flv") ;
+##  get_type("ssss.aac") ;
+##  get_type("ssss.qaac") ;
+##  get_type("zzzz.mp3") ;
+##  get_type("zzz.mp33") ;
+##  get_type("xxxx.jpeg") ;
+##  get_type("xxxx.jpegg") ;
+##  get_type("xxx.maff") ;
+##  get_type("xxx.htm") ;
+
+##  my $r = "-1" ;
+##  my $q = "z" x 3 ;
+##  say $q if $r > 0 ;
+
+
+
+##  my $v = "/home/nostromo/Downloads/000--Httrackx" ; 
+
+##  while ( $v =~ s!/([^/])[^/]+/!/$1/! ) {  }
+##  say $v ;
+##  say "===" ;
+##  
+##  $v = "/home/nostromo/Downloads/000--Httrackx" ; 
+##  
+##  say $v ;
+##  #$v =~ s{[^/]}{X} ;
+##  #$v =~ s![^/]!X! ;
+##  $v =~ s!/([^/])[^/]+/!/$1/! ;
+##  say $v ;
+##  $v =~ s!/([^/])[^/]+/!/$1/! ;
+##  say $v ;
+##  $v =~ s!/([^/])[^/]+/!/$1/! ;
+##  say $v ;
+##  $v =~ s!/([^/])[^/]+/!/$1/! ;
+##  say $v ;
+
+
+        #
+##    my %types = ( 
+##        "flv|mkv|mp4|mpeg|mpg|avi|webm" => "video",
+##        "mp3|m4a|aac"                   => "audio",
+##        "html|htm|maff"                 => "html",
+##        "jpg|jpeg|png|gif"              => "image",
+##    ) ;
+
+##      foreach my $x (keys %types) {
+##          $type = $types{$x} if $file =~ /$x/ ;
+##      }
+
+##    foreach my $x (keys %types) {
+##        $type = $types{$x} if $file =~ /[.]($x)$/ ;
+##    }
+
+
+
+
+
+##    if    ( $x =~ /[.](htm[l]?|maff)$/ )         { $type = "html" }
+##    elsif ( $x =~ /[.](flv|mkv|mp4|mpeg|mpg|avi|webm)$/ ) { $type = "video" }
+##    elsif ( $x =~ /[.](mp3|m4a|aac)$/ ) 
+
+
+
+
+
+
+
+
+
+
+
+

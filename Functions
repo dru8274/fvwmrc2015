@@ -1,0 +1,33 @@
+
+Echo "::  Functions"
+
+##  Used in :-
+##  App-Specific/003-Thunderbird
+##  App-Specific/004-Geany
+
+DestroyFunc RestoreWindowSize
+AddToFunc RestoreWindowSize
++ I State 5 False
++ I Maximize False
++ I :: my $zz = split( /\s+/, "$[*]" ) ;                          \
+        if ( $zz == 2 ) { cmd(" WindowId $[w.id] Resize $[0-]  \n") }   \
+        if ( $zz == 4 ) { cmd(" WindowId $[w.id] Resize $[0-1] \n") ;   \
+                          cmd(" WindowId $[w.id] Move $[2-3] \n") }
+
+DestroyFunc Notify
+AddToFunc Notify
++ I Exec exec notify-send "$[*]"
+
+DestroyFunc ReadFolder
+AddToFunc ReadFolder I PipeRead '         \
+    for i in "$0/"[0-9][0-9][0-9]*  ;   do   \
+        [ -f "$i" ] && echo PreProcess "$i" ; done '
+
+##  Add all subfolders of .fvwm/images to ImagePath. Must use absolute paths.
+DestroyFunc UpdateImagePath
+AddToFunc UpdateImagePath
++ I ImagePath /usr/share/pixmaps
++ I PipeRead 'for zz in $(find $[FVWM_USERDIR]/images -type d ) ; \
+        do echo ImagePath  +:$zz ; done '
+
+

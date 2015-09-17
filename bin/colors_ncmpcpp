@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+use strict ;
+use warnings ;
+use local::lib  ;
+use Term::ExtendedColor  qw(:all) ;      
+use Term::ExtendedColor::Xresources qw(
+  get_xterm_color
+  set_xterm_color
+  set_foreground_color
+  set_background_color
+);
+
+##  Apart from black/white, red(1/9) yellow(3/11) blue(4/12) and 
+##  magenta(5/13) are only colors that have been set intentionally.
+
+my $colors = set_xterm_color({
+0 => "181818",
+    1 => "a67558",
+2 => "a67458",
+    3 => "bfb273",
+    4 => "5f86ad",
+    5 => "996b99",
+6 => "86c1b9",
+7 => "d8d8d8",
+8 => "585858",
+    9 => "cc8f6c",
+10 => "a1b56c",
+    11 => "e6d68a",
+    12 => "88add1",
+    13 => "c493c4",
+14 => "86c1b9",
+15 => "f8f8f8",
+16 => "dc9656",
+});
+print $_ for values %{ $colors } ;
+

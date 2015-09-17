@@ -1,0 +1,539 @@
+##  ~/.fvwm/config
+##
+##  ███████╗ ██╗   ██╗ ██╗       ██╗ ████╗   ████╗
+##  ██╔════╝ ██║   ██║ ██║  ██╗  ██║ ██╔██╗ ██╔██║
+##  ███████╗ ╚██╗ ██╔╝ ██║ ████╗ ██║ ██║╚████╔╝██║
+##  ██╔════╝  ╚████╔╝  ██║██╔═██╗██║ ██║ ╚██╔╝ ██║
+##  ██║        ╚██╔╝   ████╔╝ ╚████║ ██║  ╚═╝  ██║
+##  ╚═╝         ╚═╝    ╚═══╝   ╚═══╝ ╚═╝       ╚═╝
+
+##  Default fvwm functions kept in /usr/share/fvwm/ConfigFvwmDefaults
+
+
+Echo "~/.fvwm/config"
+
+##  Extra function declarations.
+Read Functions
+
+####  GLOBAL SETTINGS + STYLES  
+
+DefaultFont "xft:Sans Bold:pixelsize=14"
+
+UpdateImagePath
+ModulePath $[FVWM_MODULEDIR]:$[FVWM_USERDIR]/lib
+
+####  DESKS + PAGES
+
+##  Define 7 simple desktops with no edge effects.
+InfoStoreAdd desk_min 1
+InfoStoreAdd desk_max 7
+DesktopSize 1x1
+EwmhBaseStruts 0 3 0 0
+EdgeScroll 0 0
+EdgeThickness 0
+EdgeResistance -1
+
+####  MOUSE, CURSOR + KEYS
+
+ClickTime 300
+MoveThreshold -1
+BusyCursor * False
+IgnoreModifiers L25       
+##  IgnoreModifiers - See FAQ #5.5.
+
+## Cursor styles
+CursorStyle ROOT left_ptr
+CursorStyle TITLE left_ptr
+CursorStyle DEFAULT left_ptr
+CursorStyle SYS left_ptr
+CursorStyle MENU left_ptr
+CursorStyle WAIT left_ptr
+
+####  MOVE, RESIZE, SHADE
+
+##  Keep windows opaque during moves.
+Style * ResizeOpaque
+OpaqueMoveSize unlimited
+HideGeometryWindow Never
+Emulate Fvwm
+Style * WindowShadeSteps 30
+#Style * SnapAttraction 3 Windows ScreenWindows
+
+####  FOCUS + RAISE + PLACEMENT
+
+##  Similar focus behavior to xfce/openbox.
+Style * ClickToFocus
+Style * FPSortWindowlistByFocus
+Style * RaiseTransient
+Style * LowerTransient
+Style * StackTransientParent
+Style * EWMHUseStackingOrderHints
+##  DefaultLayers (bottom|put|top)
+
+##  Prevent focus stealing by new windows.
+##  http://fvwmwiki.xteddy.org/Tips/FocusStealing/
+Style * SkipMapping
+DestroyFunc EWMHActivateWindowFunc
+AddToFunc EWMHActivateWindowFunc I Nop
+
+##  Ignore urgency hints.
+DestroyFunc UrgencyFunc
+AddToFunc UrgencyFunc I Nop
+DestroyFunc UrgencyDoneFunc
+AddToFunc UrgencyDoneFunc I Nop
+
+##  Force placement to centered.
+Style * PositionPlacement Center
+Style * !UsePPosition
+
+
+####  WINDOWS ICONIFY
+
+Colorset 81 sh #2A5E8B, hi #2A5E8B
+##  fg == text, bg == fill, sh + hi == border relief colors
+
+Style * !IconTitle
+Style * IconOverride
+Style * !UseIconPosition
+Style * IconSize -1 -1
+
+Style * IconBackgroundRelief 5
+Style * IconBackgroundColorset 81
+Style * IconBackgroundPadding 0
+
+Style * IconBox 990x150-20-36, IconGrid 234 134, IconFill right bottom
+
+Read MiniIcons
+
+##  http://materialdesignicons.com/
+
+####  DECORS, BORDERS + TITLEBAR
+
+##  Ignore decor hinting
+Style * NoDecorHint, NoFuncHint, NoOLDecor, GNOMEIgnoreHints
+Style * DecorateTransient
+
+
+#InfoStoreAdd border_color "#2C5373"
+
+#InfoStoreAdd title_color_hi "#224159"
+#InfoStoreAdd title_color_lo "#0A131A"
+
+#InfoStoreAdd button_blue_hi "#274A66"
+#InfoStoreAdd button_blue_lo "#0F1C26"
+
+#InfoStoreAdd menu_title_hi "#274A66"
+#InfoStoreAdd menu_title_lo "#11222E"
+
+#InfoStoreAdd menu_select_hi "#274A66"
+#InfoStoreAdd menu_select_lo "#11222E"
+
+#InfoStoreAdd button_red_hi "#801C2D"
+#InfoStoreAdd button_red_lo "#26080D"
+
+##  Border styles + colorsets
+Style * BorderWidth 7, HandleWidth 7
+BorderStyle InActive ( Colorset 18 -- Flat ) Active ( Colorset 19 -- Flat ) 
+Colorset 18 bg #2C5373
+Colorset 19 bg #2C5373
+
+##  Font and text-color for title-bar. 
+##  A brighter text color allows gradients to be larger
+##  Current text color HSV : V == 60
+Style * Font terminus-bold-18
+Style * Colorset 10, HilightColorset 10
+Colorset 10 fg #999991
+
+TitleStyle Centered Height 30
+TitleStyle ( HGradient 128 3 #0A131A 30 #224159 20 #224159 30 #0A131A -- Flat )
+
+ButtonStyle All VGradient 20 #274A66 #0F1C26 -- UseTitleStyle Flat
+ButtonStyle 2 VGradient 20 #801C2D #26080D -- UseTitleStyle Flat
+
+AddButtonStyle 1 MiniIcon
+AddButtonStyle 6 Pixmap window-minimize-symbolic.svg:20x20
+AddButtonStyle 4 Pixmap window-maximize-symbolic.svg:20x20
+AddButtonStyle 2 Pixmap window-close-symbolic.svg:20x20
+
+
+####  MENU STYLES
+
+##  Nix the builtin help menu.
+DestroyMenu MenuFvwmRoot
+
+MenuStyle * Font -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1
+MenuStyle * TitleFont terminus-bold-18
+MenuStyle * VerticalItemSpacing 4 4
+
+##  Colorset for normal items in the menu.
+MenuStyle * MenuColorset 3
+Colorset 3 fg #999991, sh SteelBlue4, hi SteelBlue4, Pixmap term-tile.png
+##  fg == text color ; sh+hi == borders, separators + triangles
+
+##  Colorset/styles for active (selected) items in the menu.
+MenuStyle * ActiveFore
+MenuStyle * HilightBack
+MenuStyle * ActiveColorset 5
+
+##  fg == text-color, hi == triangle-color
+Colorset 5 fg #999991, hi #36668C, \
+  HGradient 128 2 #11222E 30 #274A66 30 #11222E
+
+##  Colorset/styles for the menu title
+MenuStyle * HilightTitleBack
+MenuStyle * TitleUnderlines1
+MenuStyle * TitleColorset 7
+
+##  fg = text-color, sh/hi = seperator color
+Colorset 7 fg #999991, sh SteelBlue4, hi SteelBlue4, \
+  HGradient 128 2 #11222E 30 #274A66 30 #11222E
+
+##  The spacing between menu items etc.
+MenuStyle * ItemFormat "%|%13.13i%.15l%.5i%2.3>%10.|"
+MenuStyle * VerticalItemSpacing 3 3
+MenuStyle * VerticalTitleSpacing 5 3
+MenuStyle * VerticalMargins 0 2
+
+##  Offset of a submenu relative to its parent.
+MenuStyle * PopupOffset 6 100
+
+##  When submenu item is selected, open after a short delay.
+MenuStyle * PopupDelay 500
+
+##  Warp pointer to the menu title when submenu opened.
+MenuStyle * TitleWarp
+
+##  Max. delay (millisecs) between 2 mouse clicks for a "double-click".
+MenuStyle * DoubleClickTime 500
+
+##  other styles
+MenuStyle * Hilight3DOff
+MenuStyle * !Animation
+MenuStyle * PopupAsSubmenu
+MenuStyle * RemoveSubmenus
+MenuStyle * SubmenusRight
+MenuStyle * SeparatorsShort
+MenuStyle * TrianglesSolid
+MenuStyle * BorderWidth 5
+
+##  Define similar styles for "WindowList".
+MenuStyle WindowList Font -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1
+MenuStyle WindowList MenuColorset   3
+MenuStyle WindowList ActiveColorset 5
+MenuStyle WindowList ActiveFore
+MenuStyle WindowList HilightBack
+MenuStyle WindowList SeparatorsShort
+MenuStyle WindowList BorderWidth 5
+MenuStyle WindowList Hilight3DOff
+MenuStyle WindowList !Animation
+MenuStyle WindowList SelectOnRelease Meta_L
+MenuStyle WindowList ItemFormat "%|%13.13i%.15l%.5i%2.3>%10.|"
+#MenuStyle WindowList Font "xft:DejaVu Sans Mono:style=Book:pixelsize=16"
+
+Read Menus/001-MainMenu
+Read Menus/004-WindowOps-Menu-Def
+
+
+####  KEY BINDINGS  (see BINDINGS)
+
+##  Hide/Unhide FuBar statusbar [K1]
+Key S A 4 ToggleFuBar
+
+##  Open Clipboard Menu  [K1]
+Key C A 4 SendToModule Clipboard menu
+
+##  Gmrun [K1]
+Key G A 4 Exec exec gmrun
+
+##  Menu bindings  [K2]
+Key Escape A C Menu MainMenu Root c c
+Key Escape A 4 Menu ToolsMenu Root c c
+Key F8 A M Current Menu WindowOpsMenu Interior 0 0
+
+##  Switch focus to another window [K3]
+
+##  Focus Next Non-Iconic - Alt+Tab
+Key Tab A M WindowList (CurrentDesk, !Sticky, AcceptsFocus, !Iconic) Root c c \
+  NoCurrentDeskTitle, NoGeometry, CurrentAtEnd, \
+  IconifiedAtEnd, MaxLabelWidth 60, SelectOnRelease Meta_L
+
+##  Focus Next Iconic - Win+Tab
+Key Tab A 4 WindowList (CurrentDesk, !Sticky, AcceptsFocus,  Iconic) Root c c \
+  NoCurrentDeskTitle, NoGeometry, CurrentAtEnd, MaxLabelWidth 60, \
+  SelectOnRelease Super_L
+
+DestroyFunc WindowListFunc
+AddToFunc WindowListFunc
++ I ThisWindow (!Iconic) FlipFocus NoWarp
++ I ThisWindow (!Iconic) Raise
++ I ThisWindow ( Iconic) SendToModule WinUtils deiconify_window $[w.id]
+
+##  Basic window operations [K4]
+
+##  Maximize
+Key F11 A M FullMaximize
+##  Toggle Maximize/Restore
+Key F10 A M ToggleMaximize
+##  Iconify 
+Key F9  A M IconifyX
+##  Center window
+Key F5  A M ThisWindow Move 50-50w 50-50w
+##  Close
+Key F4  A M Close
+
+##  Move Window  [K4]
+Key Up A 4 MoveWindow 0 -1
+Key Down A 4 MoveWindow 0 1
+Key Right A 4 MoveWindow 1 0
+Key Left A 4 MoveWindow -1 0
+
+##  Resize Window [K4]
+Key Up A M4 ResizeWindowX NorthEast top_right_corner
+Key Down A M4 ResizeWindowX SouthWest bottom_left_corner
+Key Right A M4 ResizeWindowX SouthEast bottom_right_corner
+Key Left A M4 ResizeWindowX NorthWest top_left_corner
+
+DestroyFunc FullMaximize
+AddToFunc FullMaximize I SendToModule WinUtils full_mode $[w.id]
+
+DestroyFunc ToggleMaximize
+AddToFunc ToggleMaximize I SendToModule WinUtils toggle_max $[w.id]
+
+DestroyFunc IconifyX
+AddToFunc IconifyX I ThisWindow (Iconifiable, !Iconic) \
+    SendToModule WinUtils iconic_mode $[w.id]
+
+DestroyFunc MoveWindow
+AddToFunc   MoveWindow
++ I ThisWindow (Iconic) Break
++ I ThisWindow ( *xvt) Move w+$[0]c w+$[1]c
++ I ThisWindow (!*xvt) . Move <{ "w+".($[0]*8)."p" }> \
+                              <{ "w+".($[1]*8)."p" }>
+
+DestroyFunc ResizeWindowX
+AddToFunc   ResizeWindowX
++ I ThisWindow (Iconic) Break
++ I ThisWindow (FixedSize) Break
++ I WarpToWindow 50 50
++ I CursorStyle RESIZE $[1]
++ I Schedule 100 ResizeWindowY $[0]
+
+DestroyFunc ResizeWindowY
+AddToFunc   ResizeWindowY
++ I ThisWindow (!Maximized) Resize direction $[0] warptoborder
++ I ThisWindow ( Maximized) ResizeMaximize direction $[0] warptoborder
++ I WarpToWindow 50 50
+
+##  Zoom/Shrink the current window [K5] (urxvt only)
+
+##   Horizontal only.
+Key Right A C4 ThisWindow (URxvt) ZoomWindow 1 0
+Key Left A C4 ThisWindow (URxvt) ZoomWindow -1 0
+
+##   Vertical only
+Key Up A C4 ThisWindow (URxvt) ZoomWindow 0 1
+Key Down A C4 ThisWindow (URxvt) ZoomWindow 0 -1
+
+##  Horizontal and vertical
+Key Up A M ThisWindow (URxvt) ZoomWindow 1 1
+Key Down A M ThisWindow (URxvt) ZoomWindow -1 -1
+
+DestroyFunc ZoomWindow
+AddToFunc ZoomWindow I SendToModule WinUtils zoom_window $[w.id] $*
+
+##  Switch to another workspace [K6]
+
+##  Move Window to Desktop N
+PipeRead ' for zz in $(seq $[infostore.desk_min] $[infostore.desk_max]) ; do \
+   echo "Key $zz A S4 Current MoveToDesk 0 $zz" ; done '
+
+##  Move Window to L/R Desktop [K6]
+Key Right A S4 MoveToDesktopX 1
+Key Left A S4 MoveToDesktopX -1
+
+##  Switch to Desktop N [K6]
+PipeRead ' for zz in $(seq $[infostore.desk_min] $[infostore.desk_max]) ; do \
+   echo "Key $zz A 4 GotoDesk 0 $zz" ; done '
+
+##  Switch to the L/R Desktop [K6]
+Key Left A M GotoDesk -1 $[infostore.desk_min] $[infostore.desk_max]
+Key Right A M GotoDesk 1 $[infostore.desk_min] $[infostore.desk_max]
+Mouse 4 R A GotoDesk -1 $[infostore.desk_min] $[infostore.desk_max]
+Mouse 5 R A GotoDesk 1 $[infostore.desk_min] $[infostore.desk_max]
+
+DestroyFunc MoveToDesktopX
+AddToFunc   MoveToDesktopX
++ I MoveToDesk $0 $[infostore.desk_min] $[infostore.desk_max]
++ I GotoDesk $0 $[infostore.desk_min] $[infostore.desk_max]
+
+##  Volume + Brightness [K7]
+
+##  Volume and Bright with multimedia keys
+Key XF86AudioMute A A SendToModule Notify volume_mute_toggle
+Key XF86AudioRaiseVolume A A SendToModule Notify volume_up
+Key XF86AudioLowerVolume A A SendToModule Notify volume_down
+Key XF86MonBrightnessDown A A BrightDown
+Key XF86MonBrightnessUp  A A BrightUp
+
+##  Volume and Bright with alternate keys
+Key F1 A 4 SendToModule Notify volume_down
+Key F2 A 4 SendToModule Notify volume_up
+Key F3 A 4 BrightDown
+Key F4 A 4 BrightUp
+Key F5 A 4 SendToModule Notify contrast_down
+Key F6 A 4 SendToModule Notify contrast_up
+
+DestroyFunc BrightUp
+AddToFunc BrightUp  
++ I Exec sudo /root/bin/bl_up.sh
++ I Schedule 300 SendToModule Notify bright_show
+
+DestroyFunc BrightDown
+AddToFunc BrightDown  
++ I Exec sudo /root/bin/bl_down.sh
++ I Schedule 300 SendToModule Notify bright_show
+
+
+####  MOUSE BINDINGS  (see BINDINGS)
+
+##  Drag move with mouse
+Mouse 1 W M FuncFvwmRaiseLowerX Move
+
+##  Bindings for titlebar buttons [M1]
+Mouse 0 1 A ThisWindow Menu WindowOpsMenu Interior 0 0
+Mouse 0 6 A ThisWindow IconifyX
+Mouse 0 4 A ThisWindow ToggleMaximize
+Mouse 0 2 A ThisWindow Close
+
+##  Shade/UnShade [M2]
+Mouse 4 T A WindowShade True
+Mouse 5 T A WindowShade False
+
+##  Bindings for menus [M3]
+
+##  Root-Tools-Menu
+Mouse 3 R A Menu ToolsMenu Nop
+
+##  Windows-Tools-Menu
+Mouse 3 FSI A Menu WindowOpsMenu Nop
+Mouse 3 T A TitleBarX
+
+##  Main-Menu
+Mouse 1 R A ButtonOneX
+
+##  Restore an iconified window.
+Mouse 1 I A DeIconifyX
+
+DestroyFunc DeIconifyX
+AddToFunc DeIconifyX D SendToModule WinUtils deiconify_window $[w.id]
+
+DestroyFunc ButtonOneX
+AddToFunc ButtonOneX
++ H Popup MainMenu
++ D Menu MainMenu Nop
+
+DestroyFunc TitleBarX
+AddToFunc TitleBarX
++ C Focus
++ C Menu WindowOpsMenu Interior 0 0
++ H Focus
++ H Menu WindowOpsMenu Interior 0 0
++ D WindowShade
++ M Move
+
+
+####  MISCELLANEOUS STYLES/CONFIGS
+
+Style FvwmConsole StartsOnDesk 7, PositionPlacement 670p 20p
+Style FvwmConsole InitialMapCommand ResizeMove 58c 33c 730p 20p
+Style FvwmConsole !Button 1, !Button 2, !Button 4, !Button 6
+
+Style FvwmIdent !Button 1, !Button 2, !Button 4, !Button 6
+Style FvwmIdent WindowListSkip, PositionPlacement Center
+
+DestroyModuleConfig FvwmIdent: *
+*FvwmIdent: Font -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1
+*FvwmIdent: Colorset 20
+
+Colorset 20 fg grey60, Pixmap term-tile.png
+
+##  Not working for some reason
+Style xzoom* !Title
+
+Style Screenruler !Title, !Borders, !Handles
+Style Screenruler StaysOnTop, WindowListSkip, SnapGrid 2 2
+
+#Style Avidemux !Title
+Style Eog !Title, !Borders, !Handles
+Style gmrun !Title, PositionPlacement Center
+
+Style tmux1 !Title, StartsOnPage 4
+Style tmux1 InitialMapCommand ResizeMove 94 92 50-50w 50-51w
+
+Style Transmission StartsOnPage 1, PositionPlacement 445p 45p
+Style Transmission InitialMapCommand Move 445p 45p
+
+##  Displays ongoing top processes.
+Style Processes StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Processes StartsOnDesk 2, PositionPlacement 20p 458p
+Style Processes InitialMapCommand Move 20p 458p
+Style Processes !Button 1, !Button 2, !Button 4, !Button 6
+
+##  An imagemagick command to calculate the average RGB color of an image :-
+##      $ convert "dark-digital-texture--1024x768.jpg" -resize 1x1 txt:
+##  Also : http://mkweb.bcgsc.ca/color_summarizer/?analyze
+
+#########################################
+# THE START-FUNCTION - MAIN DECLARATION #
+#########################################
+
+AddToFunc StartFunction
+
++ I Echo "START-FUNCTION - Main Declarations"
++ I GotoDesk 0 4
+
+##  Wallpaper
+##  Subtle patterns : http://www.squidfingers.com/_patterns/
++ I Exec fvwm-root --retain-pixmap $[FVWM_USERDIR]/images/wallpapers/038-Geminid-Fireball-over-Mount-Balang--1366x768.png
+
++ I Read modules/FvwmPearl
++ I ReadFolder $[FVWM_USERDIR]/App-Specific
+
+##  Cleanup old files
++ I Exec rm $[FVWM_USERDIR]/tmp/*.png 2>/dev/null
++ I Exec rm $HOME/.newsbeuter/*lock* 2>/dev/null
++ I Exec exec trash-empty
+
+##  Thumbnail iconify, zoom, maximize, focus etc.
++ I Read modules/StartWinUtils
++ I Read modules/TrackFocus
++ I Read modules/NoTopLayer
+
+##  The main urxvt terminal with a tmux session.
++ I Exec exec sh -c " $[FVWM_USERDIR]/bin/tmuxer_1.sh tmux1 && urxvt -title tmux1 -e tmux attach -t tmux1 "
+
++ I Read modules/MusicPlayer
++ I Read modules/Graphs
++ I Read modules/FuBar
++ I Read modules/FvwmClipboard
++ I Read modules/Disks
++ I Read modules/FvwmPager
++ I Read modules/FvwmAnimate
++ I Module Notify
++ I Module FvwmCommandS
++ I Module FvwmConsole -terminal urxvt -g 50x60 -fg grey70 \
+  -fn -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1
+
++ I Exec exec urxvt -T Transmission -g 77x16 \
+  -fn -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1 \
+  -fb -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1 -e \
+  sh -c "$FVWM_USERDIR/bin/colors_trcli && exec transmission-remote-cli"
+
+#+ I Read modules/Processes
++ I Exec exec urxvt -T Processes -geometry 31x16 -fn terminus-bold-16 \
+  -e $[FVWM_USERDIR]/bin/top-processes.pl
+
++ I Schedule 30000 Exec exec radiotray
+
++ I UpdateImagePath
+

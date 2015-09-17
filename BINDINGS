@@ -1,0 +1,98 @@
+
+####  MOUSE-BINDINGS
+
+##  Bindings for mouse left-click on titlebar buttons [M1]
+##
+##      T/button 1                            Windows-Tools-Menu
+##      T/button 2                            Close Window
+##      T/button 4                            Maximize/Restore
+##      T/button 6                            Iconify
+##
+##  Bindings for mouse roller-ball in titlebar [M2]
+##
+##      Roll up                               WindowShade On
+##      Roll down                             WindowShade Off
+##
+##  Bindings for mouse right-click [M3]
+##
+##      In Root Window                        Open Root-Tools-Menu
+##      In Window Frame/Sides/Titlebar        Open Windows-Tools-Menu
+##      Double right-click in titlebar        Toggle Shade
+##
+##  Bindings for left-click [M4]
+##
+##      In Root Window                        Open Main-Menu
+##      On Iconified Window                   DeIconify
+##
+
+####  KEY-BINDINGS
+
+##  * Miscellaneous [K1]
+##
+##      Win-S                                Toggle Statusbar
+##      Win-C                                Clipboard Menu
+##      Win-G                                gmrun
+##
+##  * Menus bindings [K2]
+##
+##      Ctrl-Esc                             Main-Menu
+##      Win-Esc                              Root-Tools-Menu
+##      Alt-F8                               Windows-Tools-Menu
+##
+##  * Switch focus to another window [K3]
+##
+##      Alt-Tab                              Focus Next Non-Iconic 
+##      Win-Tab                              Focus Next Iconic 
+##
+##  * Basic window operations [K4]
+##
+##      Alt-F11                              Maximize
+##      Alt-F10                              Restore/Maximize
+##      Alt-F9                               Iconify 
+##      Alt-F5                               Center 
+##      Alt-F4                               Close 
+##      Win-U/D/L/R                          Move 
+##      Alt-Win-U/D/L/R                      Resize 
+##
+##         * U/D/L/R == up/down/left/right cursor keys
+##
+##  * Zoom/Shrink the current window (urxvt only) [K5]
+##
+##      Ctl-Win - Left/Right                 Horizontal only
+##      Ctl-Win - Up/Down                    Vertical only
+##      Alt     - Up/Down                    Vert. + Horiz.
+##
+##  * Switch to another workspace [K6]
+##
+##      Shift-Win - 1-9                      shift window to wkspc $num
+##      Shift-Win - Left/Right               shift window to L/R wkspc
+##      Win       - 1-9                      shift user to wkspc $num
+##      Alt       - Left/Right               shift user to L/R wkspc
+##
+##  * Volume + Brightness (as well as multimedia keys)  [K7]
+##    
+##      Win-F1                               Volume down
+##      Win-F2                               Volume up
+##      Win-F3                               Brightness down
+##      Win-F4                               Brightness up
+##      Win-F5                               Contrast down
+##      Win-F6                               Contrast up
+##    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

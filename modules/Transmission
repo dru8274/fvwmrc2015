@@ -1,0 +1,39 @@
+
+DestroyStyle Trcli
+Style Trcli StartsOnPage 1, PositionPlacement 356p 177p
+Style Trcli InitialMapCommand Move 356p 177p
+
+Exec exec urxvt               \
+  -T Trcli -g 74x16                       \
+  -fg "#808079"                           \
+  -bg "grey10"                            \
+  --color0 "#2E2E2B" --color8  "#2E2E2B"  \
+  --color1 "#B23636" --color9  "#B23636"  \
+  --color3 "#80784C" --color11 "#80784C"  \
+  --color4 "#33424C" --color12 "#33424C"  \
+  --color6 "#32453F" --color14 "#32453F"  \
+  --color7 "#878780" --color15 "#878780"  \
+  -fn terminus-bold-18 \
+  -fb terminus-bold-18 \
+  -e transmission-remote-cli
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

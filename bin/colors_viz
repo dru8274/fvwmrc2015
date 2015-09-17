@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+use strict ;
+use warnings ;
+use local::lib  ;
+use Term::ExtendedColor  qw(:all) ;      
+use Term::ExtendedColor::Xresources qw(
+  get_xterm_color
+  set_xterm_color
+  set_foreground_color
+  set_background_color
+);
+
+set_background_color('121419');
+set_foreground_color('999CA1');
+
+my $colors = set_xterm_color({
+    1 => "99BF72",
+    5 => "72BF72",
+    3 => "72BF99",
+    2 => "72BFBF",
+    6 => "6DB1C7",
+    4 => "6D9AC7",
+});
+print $_ for values %{ $colors } ;
+
+##  0 => "505152",
+##  7 => "A4A6A7",
+##  8 => "7C7D7E",
+##  9 => "E8909B",
+##  10 => "9EDCBB",
+##  11 => "DCC58F",
+##  12 => "A7C8D4",
+##  13 => "D9A4C8",
+##  14 => "BBD7D2",
+##  15 => "E8E6E4",

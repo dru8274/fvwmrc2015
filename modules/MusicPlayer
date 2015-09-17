@@ -1,0 +1,64 @@
+
+Colorset 130 TiledPixmap "digital-tile-2.png"
+Colorset 131 hi #274A66, sh #274A66, Pixmap "term-tile.png"
+#Colorset 132 bg #1F1E1C, VGradient 20 grey11 grey18
+Colorset 132 bg #1C1C1C
+Colorset 133 bg orange
+Colorset 140 fg SteelBlue4, bg SteelBlue4
+
+DestroyModuleConfig Ncmpcpp-git: *
+*Ncmpcpp-git: Geometry 774x566
+*Ncmpcpp-git: Columns 774
+*Ncmpcpp-git: Rows 566
+*Ncmpcpp-git: Padding 0 0
+*Ncmpcpp-git: BoxSize fixed
+*Ncmpcpp-git: Frame 0
+*Ncmpcpp-git: Colorset 130
+
+*Ncmpcpp-git: (774x20)
+
+####  NCMPCPP PLAYER
+
+*Ncmpcpp-git: (20x254)
+*Ncmpcpp-git: (734x254, Frame 7, Colorset 131, Swallow "ngmusic" "Exec exec urxvt -T ngmusic -g 72x12 -fn -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1 -e sh -c \"$FVWM_USERDIR/bin/colors_ncmpcpp && exec ncmpcpp-git -c $HOME/.ncmpcpp/config.new\" " )
+*Ncmpcpp-git: (20x254)
+
+*Ncmpcpp-git: (774x20)
+
+##  VISUALIZER
+
+*Ncmpcpp-git: (20x212)
+*Ncmpcpp-git: (502x212, Frame 7, Colorset 131, Swallow "ngviz"  "Exec exec urxvt --color4 '#628AB2' -g 122x33 -T ngviz -fn -misc-fixed-medium-r-normal--6-60-75-75-c-40-iso8859-1  -e \"$[FVWM_USERDIR]/bin/viztoggle.sh\" " )
+
+*Ncmpcpp-git: (20x212, Action "Exec pkill -f 912837465362 " )
+*Ncmpcpp-git: (212x212, Frame 7, Colorset 131, Id coverart, Icon coverart.png )
+*Ncmpcpp-git: (20x212)
+
+*Ncmpcpp-git: (774x20)
+
+##  TITLEBAR
+
+*Ncmpcpp-git: (7x40, Colorset 132)
+*Ncmpcpp-git: (760x40, Colorset 132, Swallow "ngbar"  "Exec exec urxvt -T ngbar -g 76x2 -fn -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1 -e \"$[FVWM_USERDIR]/bin/mpdbar\" "
+*Ncmpcpp-git: (7x40, Colorset 132)
+
+####  STYLES
+
+##  If anything goes wrong, these windows will stay on desk7 as an error.
+Style ngmusic StartsOnDesk 7
+Style ngviz StartsOnDesk 7
+Style ngbar StartsOnDesk 7
+
+DestroyStyle Ncmpcpp-git
+Style Ncmpcpp-git FixedSize, StartsOnDesk 2, MiniIcon codeina.png
+Style Ncmpcpp-git PositionPlacement 440p 72p, InitialMapCommand Move 440p 72p
+
+DestroyFunc UpdateCoverArt
+AddToFunc UpdateCoverArt
++ I SendToModule Ncmpcpp-git ChangeButton coverart Icon coverart.png
+
+KillModule FvwmButtons Ncmpcpp-git
+Module FvwmButtons Ncmpcpp-git
+
+
+

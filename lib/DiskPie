@@ -1,0 +1,302 @@
+#!/usr/bin/perl
+
+##  This script first uses Sys::Statistics::Linux to collect disk usage 
+##  info. Then it piecharts it with gnuplot. Then the piechart is 
+##  with text info by Image::Magick. Lastly, a command is sent to
+##  FVWM to update the FvwmButtons window which displays this image.
+##
+##  Gnuplot didn't work with bitmap fonts, so I used Image::Magick 
+##  instead. The piechart script is based on :-
+##  http://www.phyast.pitt.edu/~zov1/gnuplot/html/pie.html
+
+use strict ;
+use warnings ;
+
+use lib `fvwm-perllib dir`;
+use FVWM::Module;
+use IPC::Run qw( run ) ;        ##  libipc-run-perl
+use Sys::Statistics::Linux ;    ##  libsys-statistics-linux-perl
+use Math::Round ;               ##  libmath-round-perl
+use Image::Magick ; 
+use feature qw(say) ;
+
+my $module = new FVWM::Module(
+    Name => 'DiskPie',
+    Debug => 0,
+    );
+
+my $lxs = Sys::Statistics::Linux->new(
+    diskusage => 1,
+    memstats  => 1,
+) ;
+
+my $outfile = $ENV{FVWM_USERDIR}.'/images/piecharts/diskpies.png' ;
+#my $outfile = "graph1.png" ;
+
+my %rootfs = my %mydata = () ;
+my $info = $lxs->get ;
+
+##  SYSTEM PARTITION
+
+my $disk = "/dev/sda7" ;
+
+$rootfs{total} = nearest(
+    .1, $info->{diskusage}->{$disk}->{total}/1048576
+    ) ;
+$rootfs{free} = nearest(
+    .1, $info->{diskusage}->{$disk}->{free}/1048576
+    ) ;
+$rootfs{total} = 0 if not defined $rootfs{total} ;
+$rootfs{free}  = 0 if not defined $rootfs{free}  ;
+$rootfs{usageper} = round($info->{diskusage}->{$disk}->{usageper}) ;
+$rootfs{freeper} = 100 - $rootfs{usageper} ;
+
+$rootfs{name} = "/Root" ;
+$rootfs{text1} = sprintf('%.1fGB total\n', $rootfs{total}) ;
+$rootfs{text2} = sprintf('%.1fGb free', $rootfs{free}) ; 
+
+##  DATA PARTITION
+
+$disk = "/dev/sda8" ;
+
+$mydata{total} = nearest(
+    1, $info->{diskusage}->{$disk}->{total}/1048576
+    ) ;
+$mydata{free} = nearest(
+    1, $info->{diskusage}->{$disk}->{free}/1048576
+    ) ;
+$mydata{total} = 0 if not defined $mydata{total} ;
+$mydata{free}  = 0 if not defined $mydata{free}  ;
+$mydata{usageper} = round($info->{diskusage}->{$disk}->{usageper}) ;
+$mydata{freeper} = 100 - $mydata{usageper} ;
+
+$mydata{name} = "/Home" ;
+$mydata{text1}  = sprintf('%.0fGB total\n', $mydata{total}) ;
+$mydata{text2} .= sprintf('%.0fGb free', $mydata{free}) ; 
+
+##  Text label strings
+my $dused1 = $rootfs{usageper}/100 ;
+my $dfree1 = $rootfs{freeper}/100 ;
+my $dused2 = $mydata{usageper}/100 ;
+my $dfree2 = $mydata{freeper}/100 ;
+
+##  pie colors
+my $blue='0.35, 0.45, 0.52' ;
+my $bluedark='0.35*m, 0.45*m, 0.52*m' ;
+my $brown='0.8, 0.71, 0.25' ;
+my $browndark='0.8*m, 0.71*m, 0.25*m' ;
+
+##  gnuplot script
+my $in = qq{
+set terminal png size 248,170  transparent truecolor
+set output "/tmp/diskpies.png"
+
+reset
+a1=$dfree1
+a2=$dused1
+b=0.4
+s=0.2
+B=0.5
+
+y1=-.32
+y2=-.78
+
+set view 71, 180
+set parametric
+unset border
+unset tics
+unset key
+set ticslevel 0
+unset colorbox
+
+set urange [0:1]
+set xrange [-2:2]
+set yrange [-2:2]
+set zrange [0:3]
+set cbrange [-1:1]
+
+set multiplot
+
+##  PIE #1
+
+set size 1.8, 3.5
+set origin -.6, y1
+
+r=1
+m=.75
+
+##  blue - sides
+set vrange [.2:1]
+set palette model RGB functions $bluedark
+set urange [a1:a1+a2]
+splot cos(u*2*pi)*r, sin(u*2*pi)*r, s*v w pm3d
+
+##  yellow - sides
+set vrange [.2:1]
+set palette model RGB functions $browndark
+set urange [0:a1]
+splot cos(u*2*pi)*r, sin(u*2*pi)*r, s*v w pm3d
+
+##  blue - segment
+set vrange [0:1]
+set palette model RGB functions $blue
+set urange [a1:a1+a2]
+splot cos(u*2*pi)*v, sin(u*2*pi)*v, s w pm3d
+
+##  yellow - segment
+set vrange [0:1]
+set palette model RGB functions $brown
+set urange [0:a1]
+
+splot cos(u*2*pi)*v, sin(u*2*pi)*v, s w pm3d
+
+##  PIE #2
+
+set origin -.6, y2
+
+a1=$dfree2
+a2=$dused2
+
+##  blue - sides
+set vrange [.2:1]
+set palette model RGB functions $bluedark
+set urange [a1:a1+a2]
+splot cos(u*2*pi)*r, sin(u*2*pi)*r, s*v w pm3d
+
+##  yellow - sides
+set vrange [.2:1]
+set palette model RGB functions $browndark
+set urange [0:a1]
+splot cos(u*2*pi)*r, sin(u*2*pi)*r, s*v w pm3d
+
+##  blue - segment
+set vrange [0:1]
+set palette model RGB functions $blue
+set urange [a1:a1+a2]
+splot cos(u*2*pi)*v, sin(u*2*pi)*v, s w pm3d
+
+##  yellow - segment
+set vrange [0:1]
+set palette model RGB functions $brown
+set urange [0:a1]
+
+splot cos(u*2*pi)*v, sin(u*2*pi)*v, s w pm3d
+
+unset multiplot
+} ;
+
+##  RUN GNUPLOT
+
+my @cmd = qw( gnuplot ) ;
+my $out = my $err = "" ;
+run \@cmd, \$in, \$out, \$err ;
+
+##  text colors
+#my $col1='#5A7485' ;
+my $col1='#547A99' ;
+my $col2='grey60' ;
+
+my $xpos = 143 ;
+
+my $image = Image::Magick->New() ;
+$image->ReadImage('/tmp/diskpies.png') ;
+
+##  ADD TEXT INFO
+
+
+#my $font = 'gohufont-uni-14b' ;
+#mmy $font = 'gohufont-uni-14b' ;
+#my $font = 'Terminus-(TTF)-Bold:pixelsize=16' ;
+my $font = '/home/phleagol/.fonts/ter-u16b_iso-8859-1.pcf' ;
+
+$image->Annotate(
+    geometry=>"+${xpos}+33",
+    font=>$font,
+    pointsize=>14,
+    fill=>$col1, 
+    text=>$rootfs{name},
+);
+
+$image->Annotate(
+    geometry=>"+${xpos}+49",
+    font=>$font,
+    pointsize=>14,
+    fill=>$col2, 
+    text=>$rootfs{text1},
+);
+
+$image->Annotate(
+    geometry=>"+${xpos}+65",
+    font=>$font,
+    pointsize=>14,
+    fill=>$col2, 
+    text=>$rootfs{text2},
+);
+
+$image->Annotate(
+    geometry=>"+${xpos}+113",
+    font=>$font,
+    pointsize=>14,
+    fill=>$col1, 
+    text=>$mydata{name},
+);
+
+$image->Annotate(
+    geometry=>"+${xpos}+129",
+    font=>$font,
+    pointsize=>14,
+    fill=>$col2, 
+    text=>$mydata{text1},
+);
+
+$image->Annotate(
+    geometry=>"+${xpos}+145",
+    font=>$font,
+    pointsize=>14,
+    fill=>$col2, 
+    text=>$mydata{text2},
+);
+
+
+
+$image->Write($outfile) ;
+
+##  UPDATE FvwmButtons DIsks
+
+$module->send("SendToModule Disks ChangeButton pic5 Icon diskpies.png") ;
+
+#say STDERR "[DiskPie] Finished" ;
+
+
+#say "$rootfs{freeper}% : $rootfs{free}Gb free of $rootfs{total}Gb" ;
+#say "$swap{freeper}% : $swap{free}Gb free of $swap{total}Gb" ;
+
+#$rootfs{total} = sprintf('%6.1f', nearest(
+#    .1, $info->{diskusage}->{$disk}->{total}/1048576
+#    )) ;
+#$rootfs{free} = sprintf('%6.1f', nearest(
+#    .1, $info->{diskusage}->{$disk}->{free}/1048576
+#   )) ;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

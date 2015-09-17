@@ -1,0 +1,92 @@
+
+Echo ":: Clipboard Menus"
+
+
+##  ╔══════════════════════╗
+##  ║   CLIPBOARD MENUS    ║
+##  ╚══════════════════════╝
+
+DestroyModuleConfig Clipboard: *
+*Clipboard: Records_Max             20
+*Clipboard: Menu_Chars_Max          35
+*Clipboard: Menu_Title              "Fvwm Clipboard"
+*Clipboard: XBuffer                 clipboard
+*Clipboard: Icon_Youtube_Link       youtube-url_16x16.png
+*Clipboard: Icon_Other_Link         html-url_16x16.png
+*Clipboard: Icon_Html_File          html-file_16x16.png
+*Clipboard: Icon_Video_File         video-file_16x16.png
+*Clipboard: Icon_Audio_File         audio-file_16x16.png
+*Clipboard: Icon_Image_File         image-file_16x16.png
+*Clipboard: Icon_Clear_History      clear-history_16x16.png
+*Clipboard: Func_Video_File         Videos
+*Clipboard: Func_Youtube_Link       Youtube
+*Clipboard: Func_Html_File          Urls
+*Clipboard: Func_Other_Link         Urls
+
+##  This can obviously be improved
+Deschedule 54657
+Schedule Periodic 1000 54657 SendToModule Clipboard sync
+
+KillModule Clipboard
+Module Clipboard
+
+
+##  Text copied to the system clipboard will trigger one of these menus if
+##  they match a regexp. As defined in the clipboard manager script clipmon.pl
+
+##  The main clipboard manager menu is run from a perl function.
+##  Key C A 4 PerlEval MyPerl::Clipboard::clipmenu
+
+
+DestroyFunc Urls
+AddToFunc   Urls
++ I DestroyMenu  UrlsMenu
++ I AddToMenu    UrlsMenu "Urls Menu" Title
++ I AddToMenu    UrlsMenu "%html-file_16x16.png%New &Tab "     Exec exec firefox -new-tab "$*"
++ I AddToMenu    UrlsMenu "%html-file_16x16.png%New &Window "  Exec exec firefox -new-window "$*"
++ I WindowId root 1 WarpToWindow 50 49
++ I Schedule 200 Popup UrlsMenu Root c c Nop
+
+
+DestroyFunc Youtube
+AddToFunc Youtube
++ I DestroyMenu  YoutubeMenu
++ I AddToMenu    YoutubeMenu Youtube Title
++ I AddToMenu    YoutubeMenu "  mpv      " Exec exec        \
+      mpv --quiet --ytdl --ytdl-format='135+141/244+141/18/43/134+172/243+172/5/36' "$*"
++ I AddToMenu    YoutubeMenu "  firefox  " Exec exec firefox "$*"
++ I AddToMenu    YoutubeMenu "  yt-dl+   " Exec             \
+      echo "$*" >> ~/Downloads/000--Httrackx/MLG_Dallas/list
++ I Schedule 200 Popup YoutubeMenu Root c c Nop
+
+DestroyFunc Videos
+AddToFunc Videos
++ I DestroyMenu  VideosMenu
++ I AddToMenu    VideosMenu Videos Title
++ I AddToMenu    VideosMenu  "  mpv  " Exec exec mpv "$*"
++ I AddToMenu    VideosMenu  "  vlc  " Exec exec vlc "$*"
++ I AddToMenu    VideosMenu  "  info  " Exec exec urxvt -fg grey70 \
+    -T mediainfo -fn -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1 \
+    -geometry 53x31 -e sh -c "mediainfo \"$*\" | cut -c 1-27,43- | less -S "
++ I WindowId root 1 WarpToWindow 50 49
++ I Schedule 200 Popup VideosMenu Root c c Nop
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

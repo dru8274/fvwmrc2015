@@ -1,0 +1,201 @@
+#!/usr/bin/perl
+
+##  A WORKING SCRIPT IN PROGRESS
+##  WORKS BEAUTIFULLY NOW. CURRENT BEST.
+
+##  Gtk2::Notify has an excellent folder full of examples
+##  It seems icons are resized such that their icon
+##  equals the height of three lines of text. Which in 
+##  In this case that equals about 42x42
+
+use utf8 ;
+use strict ;
+use warnings ;
+use feature qw( say ) ;
+use v5.18 ;
+
+use lib `fvwm-perllib dir`;
+use FVWM::Module ;
+use Gtk2::Notify ;
+use Math::Round qw( round nearest ) ; 
+use General::Parse qw( get_tokens ) ;
+#use Data::Dump qw( dump ) ;
+
+my $notify_timeout = 10 ;
+my $notify_last = 0 ;
+
+my $contrast = 100 ;
+my $contrast_step = 10 ;
+
+##  hash of notify objects in use.
+my %notify = ( 
+    volume => 0,
+    bright => 0,
+) ;
+
+my $module = new FVWM::Module(
+    Name => 'Notify',
+    Debug => 0,
+    );
+
+$module->addHandler(M_STRING, \&process_cmd);
+$module->event_loop ;
+
+####  SUBROUTINES
+
+sub process_cmd {
+
+    my ($module, $event) = @_ ;
+    my ($command, @args) = get_tokens($event->_text) ;
+
+    my %cmd = (
+        volume_up => sub { volume_up() },
+        volume_down => sub { volume_down() },
+        volume_mute => sub { volume_mute() },
+        volume_unmute => sub { volume_unmute() },
+        volume_mute_toggle => sub { volume_mute_toggle() },
+        volume_show => sub { volume_show() },
+        bright_show => sub { bright_show() },
+        contrast_up => sub { contrast_up() },
+        contrast_down => sub { contrast_down() },
+        contrast_show => sub { contrast_show() },
+    ) ;
+
+    if (defined $cmd{$command}) {
+        $cmd{$command}() ;
+    } else {
+        $module->showMessage("unknown command \"$command\"");
+    }
+}
+
+sub reinit_notify {
+    #say STDERR "[Notify] Reinit Gtk2::Notify" ;
+    Gtk2::Notify->uninit ;
+    Gtk2::Notify->init('fvwm.notify') ;
+    foreach my $key (keys %notify) { $notify{$key} = 0 } ;
+}
+
+sub send_notify {
+
+    my ($key, $message) = @_ ;
+    reinit_notify() if time() - $notify_last > $notify_timeout ;
+#    say "key : message = $key : $message" ;
+
+    if ( $notify{$key} )  {
+        $notify{$key}->update( $message ) 
+    } else {
+        $notify{$key} = Gtk2::Notify->new( $message ) 
+    }
+
+    ##  Display notification object.
+    $notify{$key}->show ;
+    $notify_last = time() ;
+} 
+
+sub get_progress  {
+
+    my ($num_in, $max_in) = @_ ;
+
+    my @progress=( "[               ]",
+        "[-              ]", "[=              ]", "[=-             ]", 
+        "[==             ]", "[==-            ]", "[===            ]", 
+        "[===-           ]", "[====           ]", "[====-          ]",
+        "[=====          ]", "[=====-         ]", "[======         ]",
+        "[======-        ]", "[=======        ]", "[=======-       ]",
+        "[========       ]", "[========-      ]", "[=========      ]",
+        "[=========-     ]", "[==========     ]", "[==========-    ]",
+        "[===========    ]", "[===========-   ]", "[============   ]",
+        "[============-  ]", "[=============  ]", "[=============- ]",
+        "[============== ]", "[==============-]", "[===============]"
+    ) ;
+
+    my $normalized = $num_in * $#progress / $max_in ;
+    return $progress[nearest(1, $normalized)] ;
+}
+
+sub volume_show  {
+#    my $volume_icon = "/home/nostromo/.fvwm/images/notification/audio-volume-medium-symbolic.svg" ;
+    my $progress = get_progress( volume_get(), 100) ;
+    my $message = " Vol: $progress " ;
+    send_notify("volume", $message ) ;
+}
+
+sub volume_get  {
+    foreach my $x (`amixer scontents` ) {
+        return $1 if $x =~ /^\s+Mono:\s+Playback.+\[(\d\d?\d?)%\].+$/ ;
+    }
+}
+
+sub volume_up  {
+    system( 'amixer set Master "3%+" -q &>/dev/null' ) ;
+    volume_unmute() ;
+    $module->send("Schedule 500 SendToModule Notify volume_show")
+}
+
+sub volume_down  {
+    system( 'amixer set Master "3%-" -q &>/dev/null' ) ;
+    volume_unmute() ;
+    $module->send("Schedule 500 SendToModule Notify volume_show")
+}
+
+sub volume_mute_toggle  {
+
+    foreach my $x (`amixer scontents`) {
+        next if $x !~ /^\s+Mono/ ;
+        if ($x =~ /^.+Playback.+off.+$/)  {
+            volume_unmute() ;
+        } else {
+            volume_mute() ;
+        }
+        return ;
+    }
+}
+
+sub volume_mute  {
+    system( "amixer set Master mute -q &>/dev/null" ) 
+}
+
+sub volume_unmute  {
+    system( "amixer set Master unmute -q &>/dev/null" )
+}
+
+sub get_bright  {
+    my $bright_max = 255 ;
+    my $bright_actual = "/sys/class/backlight/radeon_bl0/actual_brightness" ;
+    my $num = `cat $bright_actual` ;
+    return round $num*100/$bright_max ;
+}
+
+sub bright_show  {
+    my $bright_icon = "/home/phleagol/.fvwm/images/notification/display-brightness-symbolic.svg" ;
+    my $progress = get_progress( get_bright(), 100) ;
+    my $message = " LCD: $progress " ;
+    send_notify("bright", $message ) ;
+}
+
+sub contrast_up  {
+    $contrast += $contrast_step ;
+    $contrast = 100 if $contrast > 100 ;
+    system "xcalib -c && xcalib -co $contrast -a" ;
+    $module->send("Schedule 500 SendToModule Notify contrast_show")
+}
+
+sub contrast_down  {
+    $contrast -= $contrast_step ;
+    $contrast = 0 if $contrast < 0 ;
+    system "xcalib -c && xcalib -co $contrast -a" ;
+    $module->send("Schedule 500 SendToModule Notify contrast_show")
+}
+
+sub contrast_show  {
+    my $progress = get_progress($contrast, 100) ;
+    my $message = " Con: $progress " ;
+    send_notify("contrast", $message ) ;
+}
+
+
+
+
+
+
+

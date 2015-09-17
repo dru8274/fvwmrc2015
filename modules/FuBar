@@ -1,0 +1,160 @@
+##  FBBar - a combined system-tray and status-bar.
+##
+##  A combined statusbar and system-tray. The bar is implemented as
+##  FvwmButtons module. Stalonetray is swallowed by FBBar to provide
+##  the system-tray. An fvwmperl module FBBarStats uses
+##  Sys::Statistics::Linux to monitor system info, and to keep
+##  FBBar updated with the info. Helper functions make it easy
+##  to hide/unhide and restart.
+##
+##  See also : ~/.fvwm/modules/FBBarStats
+
+DestroyModuleConfig FuBar: *
+*FuBar: Geometry 1366x20
+*FuBar: Columns 1366
+*FuBar: Rows 20
+*FuBar: Padding 0 0
+*FuBar: BoxSize fixed
+*FuBar: Frame 0
+*FuBar: Fore gray65
+*FuBar: Back gray9
+*FuBar: Font -misc-tamsyn-bold-r-normal--20-145-100-100-c-100-iso8859-1
+
+*FuBar: (20x20)
+
+##  Desktop indicators
+*FuBar: (40x20, Colorset 101, Title "1")
+*FuBar: (40x20, Colorset 102, Title "2")
+*FuBar: (40x20, Colorset 103, Title "3")
+*FuBar: (40x20, Colorset 104, Title "4")
+*FuBar: (40x20, Colorset 105, Title "5")
+*FuBar: (40x20, Colorset 106, Title "6")
+*FuBar: (40x20, Colorset 107, Title "7")
+*FuBar: (20x20)
+
+##  CPU graph
+*FuBar: (30x20, Colorset 73, Icon bar_cpu2.xbm)
+*FuBar: (20x20)
+*FuBar: (40x20, id z2, Title (Right) "99%")
+*FuBar: (25x20)
+*FuBar: (8x20, id g0, Fore gray60, Icon 1245.xbm)
+*FuBar: (8x20, id g1, Fore gray60, Icon 3524.xbm)
+*FuBar: (8x20, id g2, Fore gray60, Icon 2134.xbm)
+*FuBar: (8x20, id g3, Fore gray60, Icon 3521.xbm)
+*FuBar: (8x20, id g4, Fore gray60, Icon 1245.xbm)
+*FuBar: (40x20)
+
+##  Memory
+*FuBar: (30x20, Colorset 73, Icon mem.xbm)
+*FuBar: (20x20)
+*FuBar: (60x20, id z4, Title (Right) "528MB")
+*FuBar: (30x20)
+
+# 60p = 40p + 20p
+
+##  Download
+*FuBar: (30x20, Colorset 73, Icon bar_down.xbm)
+*FuBar: (25x20)
+*FuBar: (80x20, id z5, Title (Right) "234KB/s")
+*FuBar: (35x20)
+# 76p = 56p + 20p
+
+## Upload
+*FuBar: (30x20, Colorset 73, Icon bar_up.xbm)
+*FuBar: (25x20)
+*FuBar: (80x20, id z6, Title (Right) "234KB/s")
+*FuBar: (35x20)
+
+
+##  Stalonetray
+*FuBar: (30x20, Colorset 73, Icon bar_info.xbm)
+
+*FuBar: (20x20)
+##  *FuBar: (64x20)
+
+*FuBar: (80x20, Right, Swallow "stalonetray" "Schedule 4000            \
+    Exec exec stalonetray --geometry 1x1-3000-3000 --max-geometry 4x1  \
+    --scrollbars horizontal --grow-gravity E --icon-gravity W          \
+    --kludges force_icons_size -i 20 --parent-bg true  -d none         \
+    --log-level info 2> $[FVWM_USERDIR]/.systray.log" )
+
+*FuBar: (4x16)
+
+##  Date + Time
+*FuBar: (24x20, Colorset 73, Icon bar_clock3.xbm)
+*FuBar: (25x20)
+*FuBar: (60x20, id z7, Title (Right) " 3 Jul")
+*FuBar: (10x20)
+*FuBar: (70x20, id z8, Title (Right) " 15:58:")
+*FuBar: (20x20, id z9, Title (Right) "22")
+*FuBar: (25x20)
+#*FuBar: (1x20, Colorset 74)
+
+
+####  FUBAR STYLES
+
+
+##  tamsyn-bold-20 char == 10px * 20px
+##  Each gohufont-14 char is 8p wide.
+
+Colorset 72 fg gray60, bg gray10
+#Colorset 73 fg LightSlateGray, bg Gray20
+Colorset 73 fg #5B80A6, bg Gray20
+Colorset 101 fg gray60, bg gray9
+Colorset 102 fg gray60, bg gray9
+#Colorset 103 fg LightSlateGray, bg Gray20
+Colorset 103 fg #6993BF, bg Gray20
+Colorset 104 fg gray60, bg gray9
+Colorset 105 fg gray60, bg gray9
+Colorset 106 fg gray60, bg gray9
+Colorset 107 fg gray60, bg gray9
+
+DestroyStyle FuBar
+Style FuBar !Title, !Handles, !Borders,
+Style FuBar Sticky, StaysOnTop, WindowListSkip, NeverFocus
+Style FuBar PositionPlacement 0p 748p, InitialMapCommand Move 0p 748p
+UpdateStyles
+
+DestroyFunc ToggleFuBar
+AddToFunc ToggleFuBar
++ I Next (FuBar, Sticky) LowerFuBar
++ I Next (FuBar, Sticky) Break
++ I Next (FuBar, !Sticky) RaiseFuBar
+
+DestroyFunc LowerFuBar
+AddToFunc LowerFuBar
++ I Move 0p 753p
++ I Schedule 200 Move 0p 758p
++ I Schedule 400 Move 0p 763p
++ I Schedule 600 Move 0p 768p
++ I Schedule 620 ThisWindow WindowStyle !Sticky
+
+# 768 763 758 754 752
+##  768  763  758   753  748
+
+DestroyFunc RaiseFuBar
+AddToFunc RaiseFuBar
++ I Move 0p 763p
++ I Schedule 200 Move 0p 758p
++ I Schedule 400 Move 0p 753p
++ I Schedule 600 Move 0p 748p
++ I Schedule 620 ThisWindow WindowStyle Sticky
+
+DestroyFunc RestartFuBar
+AddToFunc RestartFuBar
++ I Exec exec pkill volumeicon
++ I Exec exec pkill radiotray
++ I Exec exec pkill stalonetray
++ I Schedule 5000 Exec exec volumeicon
+#+ I UpdateImagePath
++ I UpdateStyles
++ I KillModule FvwmButtons FuBar
++ I Module FvwmButtons FuBar
++ I KillModule FuBarStats
++ I Module FuBarStats
++ I DeSchedule 986521
+#+ I Schedule 4000 Schedule Periodic 950 986521 SendToModule FuBarStats update
+
+##  Key  S      A 4 ToggleFBBar
+RestartFuBar
+

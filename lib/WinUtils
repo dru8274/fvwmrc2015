@@ -1,0 +1,944 @@
+#!/usr/bin/perl
+
+use strict ;
+use warnings ;
+#use diagnostics ;
+#use splain ;
+# use common::sense 
+
+use lib `fvwm-perllib dir`;
+use FVWM::Module;
+use Data::Dump qw( dump ) ;
+use General::Parse ;
+use IPC::Run qw( run ) ;
+#use File::Spec;
+use Image::Magick ;             ##  libimage-magick-perl
+use Math::Round ;
+#use Scalar::Util::Numeric qw(isint) ;
+use v5.18 ;
+
+##  Unused, but example code is still in discarded code at bottom.
+##  my $scheduler = $module->track("Scheduler") ;
+
+##  ModulePath $[FVWM_MODULEDIR]:/home/nostromo/temp-fvwmperl
+##  Module test2.pl
+##  SendToModule test6.pl Hold_Center 16777225 6
+##  KillModule test6.pl
+
+my $module = new FVWM::Module(
+    Name => 'WinUtils',
+    Debug => 0,
+);
+
+my $modname = $module->name ;
+
+my $w = {} ;
+my @cmds = () ;
+
+
+##  my $thumb_w = 200;
+##  my $thumb_h = 100;
+##  my $miniicon_padding = 0 ;
+##  my $miniicon_backcolor = "grey15" ;
+##  my $miniicon_borderwidth = 1 ;
+##  my $miniicon_bordercolor = "grey50" ;
+##  my $miniicon_dir = "$ENV{FVWM_USERDIR}/images/mini-icons" ;
+
+##  These vars gain their values from the module config.
+##  All about the miniicons and thumbnail iconify.
+my $thumb_w ;
+my $thumb_h ;
+my $miniicon_padding ;
+my $miniicon_backcolor ;
+my $miniicon_borderwidth ;
+my $miniicon_bordercolor ;
+my $miniicon_dir ;
+
+####  EVENT HANDLERS
+
+$module->add_handler(M_CONFIG_INFO, \&read_config) ;
+$module->add_handler(M_END_CONFIG_INFO, sub {
+    debug("[$modname] read config finished", 0) ;
+    $module->add_handler(M_MINI_ICON, \&add_mini_icon) ;
+    $module->add_handler(M_ADD_WINDOW | M_CONFIGURE_WINDOW, \&update_window) ;
+    $module->add_handler(M_DESTROY_WINDOW, \&delete_window) ;
+    $module->add_handler(M_RES_CLASS, \&add_res_class) ;
+    $module->add_handler(M_WINDOW_NAME, \&add_win_name) ;
+    $module->addHandler(M_STRING, \&process_cmd);
+    $module->send("Send_WindowList") ;
+});
+
+####  MAIN EVENT LOOP
+
+debug("[$modname] read config started", 0) ;
+$module->send("Send_ConfigInfo");
+$module->send("Read MiniIcons");
+$module->event_loop ;
+
+####  SUBROUTINES
+
+sub read_config {
+    my ($module, $event) = @_;
+    return unless $event->_text =~ /^\*$modname(.*)$/;
+    process_config($1);
+}
+
+sub process_config {
+    my ($s) = @_;
+    my ($option, $args)= $s =~/\s*(\w+)\s*(.*)/;
+
+    my %opts = (
+        ThumbIconWidth => sub { $thumb_w = $args },
+        ThumbIconHeight => sub { $thumb_h = $args }, 
+        MiniIconPadding => sub { $miniicon_padding = $args },
+        MiniIconBackgroundColor => sub { $miniicon_backcolor = $args },
+        MiniIconBorderWidth => sub { $miniicon_borderwidth = $args },
+        MiniIconBorderColor => sub { $miniicon_bordercolor = $args },
+        MiniIconFolder => sub { $miniicon_dir = $args },
+    ) ;
+
+    if (defined $opts{$option}) {
+        debug("[WinUtils] [Config] $option : $args", 0) ;
+        $opts{$option}() ;
+    } else {
+        $module->showMessage("Unknown option \"$option\"");
+    }
+}
+
+sub process_cmd {
+
+    my ($module, $event) = @_ ;
+    my ($command, @args) = get_tokens($event->_text) ;
+
+    my %cmd = (
+        normal_mode      =>  sub { normal_mode(@args)      },
+        full_mode        =>  sub { full_mode(@args)        },
+        iconic_mode      =>  sub { iconic_mode(@args)      },
+        restore_mode     =>  sub { restore_mode(@args)     },
+        zoom_window      =>  sub { zoom_window(@args)      },
+        toggle_max       =>  sub { toggle_max(@args)       },
+        deiconify_window =>  sub { deiconify_window(@args) },
+        dump             =>  sub { dump_window_info()      },
+    ) ;
+
+    if (defined $cmd{$command}) {
+        $cmd{$command}() ;
+    } else {
+        debug("[WinUtils] unknown command \"$command\"", 0);
+    }
+}
+
+sub iconic_mode  {
+
+    ##  howto deal with "NoIcon" windows
+    ##
+    ##  Detailed IM geometry syntax described here:-
+    ##  http://www.imagemagick.org/script/command-line-processing.php
+    ##
+    ##  Only thumbnails correctly if target window is in
+    ##  the current desktop, and atop other windows.
+    ##
+    ##  If any xwd/imagemagick cmnds fail, then return/fail immediately.
+
+    my $wid = shift ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;
+    debug("iconify_window : start : $wid", 0) ;
+
+    my $aspect = $thumb_w / $thumb_h ;
+    my $thumbfile = "$ENV{FVWM_USERDIR}/tmp/$wid.png" ;
+
+    ##  Grab image of current window.
+    ##  retvar for IMagick is always undef except when in error
+    
+    my $out = my $in = my $err = "" ;
+    my @cmd = qw( xwd -silent -nobdrs -id ) ;
+    push @cmd, $wid ; 
+    push @cmd, qw( -out /tmp/thumbicon.xwd ) ;
+
+    run \@cmd, \$in, \$out, \$err ;
+
+    if ($err or not -r "/tmp/thumbicon.xwd")  {
+        debug("iconify_window : xwd FAILED : $wid", 0) ;
+        say STDERR $err ;
+        return 0 ;
+    }
+
+    my $thumb = Image::Magick->New() ;
+    return 0 if not open (XWD, "/tmp/thumbicon.xwd") ;
+
+    return 0 if $thumb->Read(file => \*XWD) ;
+    close XWD ;
+
+    my $xwd_w = $thumb->Get('columns') ;
+    my $xwd_h = $thumb->Get('rows') ;
+
+    ##  Crop the window such that it can still be recognized.
+    if ( $xwd_w/$xwd_h < $aspect )  {
+        my $hh = int($xwd_w / $aspect) ;
+        return 0 if $thumb->Crop(
+            geometry => "${xwd_w}x${hh}+0+0"
+        ) ;
+        $xwd_h = $thumb->Get('rows') ;
+    } elsif ( $xwd_w/$xwd_h > $aspect )  {
+        my $ww = int($xwd_h * $aspect) ;
+        return 0 if $thumb->Crop(
+            geometry => "${ww}x${xwd_h}+0+0"
+        ) ;
+        $xwd_w = $thumb->Get('columns') ;
+    }
+
+    ##  Convert large image into a smaller thumbnail.
+    return 0 if $thumb->Thumbnail(
+        geometry => "${thumb_w}x${thumb_h}!"
+    ) ;
+
+    ##  Add a mini-icon-to thumbnail, if avail.
+    my $mini = get_mini_icon($wid) ;
+    if ($mini)  {
+        return 0 if $thumb->Composite(
+            image => $mini, 
+            gravity => "SouthEast",
+        ) ;
+    } ;
+
+    ##  Save the finished thumbnail.
+    open(IMAGE, ">$thumbfile") ;
+    return 0 if $thumb->Write(
+        file=>\*IMAGE,
+        filename=>$thumbfile, 
+        quality => 1
+    ) ;
+    close IMAGE ;
+
+    ##  Tell fvwm to iconify the window.
+    addcmd("WindowStyle Icon $thumbfile ") ;
+    addcmd("Iconify True") ;
+    addcmd("All (CurrentDesk, Iconic) PlaceAgain Icon") ;
+    sendcmds($wid) ;
+
+    ##  Set window status to iconic.
+    $w->{$wid}->{"iconic"} = 1 ;
+    debug("iconify_window : end", 0) ;
+
+    ##  Cleanup.
+    undef $mini ;
+    undef $thumb ;
+    unlink "/tmp/thumbicon.xwd" ;
+
+    return 1 ;
+}
+
+sub get_mini_icon {
+
+    my $wid = shift ;
+    debug("[get_mini_icon] Start", 0) ;
+
+    return 0 if not defined $w->{$wid}->{mini_icon} ;
+    return 0 if not -r $w->{$wid}->{mini_icon} ;
+    #debug("[get_mini_icon] Readable OK", 1) ;
+
+    ##  Read in the miniicon image
+    my $miniicon = Image::Magick->new ;
+    return 0 if not open(IMAGE, $w->{$wid}->{mini_icon}) ;
+    return 0 if $miniicon->Read(file=>\*IMAGE) ;
+    close IMAGE ;
+
+    ##  Create an empty canvas that is slightly larger.
+    my $mini_h = $miniicon->Get('rows') + $miniicon_padding ;
+    my $mini_w = $miniicon->Get('columns') + $miniicon_padding ;
+    my $mini_geom = "${mini_w}x${mini_h}" ;
+
+    my $mini = Image::Magick->New() ;
+    $mini->Set(size => $mini_geom) ;
+    return 0 if $mini->ReadImage("canvas:$miniicon_backcolor") ;
+
+    ##  Place the miniicon atop the canvas.
+    return 0 if $mini->Composite(
+        image => $miniicon, 
+        gravity => "Center",
+    ) ;
+
+    ##  Add a border to the north and west sides. 
+    return 0 if $mini->Splice(
+        gravity => "northwest",
+        geometry => "${miniicon_borderwidth}x$miniicon_borderwidth",
+        background => $miniicon_bordercolor,
+    ) ;
+
+    ##  Return okay if above steps all completed correctly.
+    undef $miniicon ;
+    return $mini ;
+}
+
+sub deiconify_window  {
+
+    my $wid = shift ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex2int
+    my $max = $w->{$wid}->{max_mode}   ; 
+    my $iconic = $w->{$wid}->{iconic} ;
+
+    debug("deiconify_window : start : $wid", 0) ;
+
+    my $file = "$ENV{FVWM_USERDIR}/tmp/$wid.png" ;
+    unlink $file ;
+
+    addcmd("Layer") ;
+    addcmd("Iconify False") ;
+    addcmd("All (CurrentDesk, Iconic) PlaceAgain Icon") ;
+
+    sendcmds($wid) ;
+    $w->{$wid}->{iconic} = 0 ;
+    debug("deiconify_window : end", 1) ;
+
+    if  ($max) { full_mode($wid)   
+    } else { normal_mode($wid) }
+
+}
+
+##  To zoom the window horizontally and vertically. 
+##  Only reliable for urxvt and similar for now.
+sub zoom_window  {
+
+    my ($wid, $x, $y) = @_ ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+    debug("zoom_window : start : $wid", 0) ;
+
+    my %u = %{ $w->{$wid} } ; 
+    my ($max, $border) = @u{"max_mode", "border"} ;
+    my ($iconic, $res_class) = @u{"iconic", "res_class"} ;
+    my ($xpos, $ypos) = @u{"xpos", "ypos"} ;
+    my ($wdth, $hght) = @u{"ww", "hh"} ;
+
+    if ($max or $iconic)  {
+        debug("zoom failed : max/iconic", 0) ;
+        return 0 ;
+    }
+
+    my ($move_x, $move_y, $resiz_w, $resiz_h, $xinc, $yinc) = "" x 6 ;
+
+    if ($res_class =~ /xvt/) {
+        $xinc = ($w->{$wid}->{resize_inc_w} * $x) ;
+        $yinc = ($w->{$wid}->{resize_inc_h} * $y) ;
+    } else {
+        $xinc = 8 * $x ;
+        $yinc = 8 * $y ;
+    }
+
+    $move_x = round($xpos - $xinc/2) ;
+    $move_y = round($ypos - $yinc/2) ;
+    $move_x = $move_x < 0 ? "+-".abs($move_x)."p" : "++".$move_x."p" ;
+    $move_y = $move_y < 0 ? "+-".abs($move_y)."p" : "++".$move_y."p" ;
+
+    $resiz_w = $wdth + $xinc ;
+    $resiz_h = $hght + $yinc ;
+    $resiz_w = $resiz_w <= 20 ? "20p" : $resiz_w . "p" ;
+    $resiz_h = $resiz_h <= 20 ? "20p" : $resiz_h . "p" ;
+
+    my $args = " frame $resiz_w $resiz_h $move_x $move_y ewmhiwa " ;
+    addcmd("ThisWindow ResizeMove $args ") ;
+    sendcmds($wid) ;
+}
+
+sub toggle_max  {
+
+    my $wid = shift ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+
+    my $max = $w->{$wid}->{max_mode}   ; 
+    my $iconic = $w->{$wid}->{iconic} ;
+    return 0 if $iconic ;
+
+    debug("toggle_max : max = $max, iconic = $iconic", 1) ;
+
+    if ($max) { normal_mode($wid)   
+    } else { full_mode($wid) }
+
+    debug("toggle_max : finished : $wid", 0) ;
+}
+
+sub normal_mode {
+
+    my $wid = shift ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+
+    debug("normal_mode : start : $wid", 0) ;
+
+    ##  Fetch extra info for this window.
+    my %u = %{ $w->{$wid} } ; 
+    my $max = $u{max_mode} ;
+    my ($iconic, $title, $borders) = @u{"iconic", "title", "border"} ;
+    my ($xx, $yy, $ww, $hh) = @u{"xpos", "ypos", "ww", "hh"} ;
+
+    deiconify_window($wid) if $iconic ;
+
+    ##  Reset windowstyles for normal mode.
+    my $stub1 = "ThisWindow WindowStyle" ;
+
+    addcmd("$stub1 Maximizable, VariableSize") ;
+    addcmd("$stub1 VariablePosition, NoResizeOverride ") ;
+    addcmd("UpdateStyles") ;
+    addcmd("ThisWindow Maximize False") ;
+
+    ##  Restore title and border, but only when previous mode was max.
+    if ( $max ) {
+        addcmd("$stub1  Title") if $title ;
+        addcmd("$stub1 !Title") if not $title ;
+        addcmd("$stub1  Borders") if $borders ;
+        addcmd("$stub1 !Borders") if not $borders ;
+     }
+
+    ##  Restore window geometry
+    addcmd("ThisWindow Resize frame ${ww}p ${hh}p") ;
+    addcmd("ThisWindow Move ${xx}p ${yy}p") ;
+    addcmd("FlipFocus NoWarp") ;
+    addcmd("Raise") ;
+
+    ##  Set window mode to unmaximized.
+    sendcmds($wid) ;
+    $w->{$wid}->{"max_mode"} = 0 ;
+    debug("normal_mode : stop", 1) ;
+}
+
+sub full_mode  {
+
+    my $wid = shift ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+    debug("full_mode : start : $wid", 0) ;
+
+    ##  Fetch extra info for this window.
+    my $max = $w->{$wid}->{max_mode} ; 
+
+    ##  Store title/border for this window except when max.
+    update_xprops($wid) unless $max ; 
+
+    ##  Set window styles for fullmax.
+    my $stub1 = "ThisWindow WindowStyle" ;
+
+    addcmd("$stub1 !Title, !Borders, ResizeHintOverride ") ;
+    addcmd("$stub1 Maximizable, !FixedSize, !FixedPosition") ;
+    addcmd("UpdateStyles") ;
+    addcmd("ThisWindow Maximize True 100 100 ") ;
+    addcmd("$stub1 !Maximizable, FixedSize, FixedPosition") ;
+    addcmd("UpdateStyles") ;
+    addcmd("FlipFocus NoWarp") ;
+    addcmd("Raise") ;
+
+    ##  Set window mode to fullmax.
+    $w->{$wid}->{max_mode}  = 1 ;
+
+    ##  Run the stored FVWM commands.
+    debug("full_mode : stop", 1) ;
+    sendcmds($wid) ;
+}
+
+sub update_xprops    {
+
+    my $wid = shift ;
+    $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex2int
+
+    my @out = () ;
+    foreach (`xprop -id $wid`) {
+        if (/^_NET_FRAME_EXTENTS.\w*[)] = (\d+), (\d+), (\d+), (\d+)/) {
+            @out = ($1, $2, $3, $4) ;
+            last ;
+        }
+    }
+
+    my $num = 0 ;
+    foreach (@out) { $num++ if $_ == 0 }
+    my $border = $num > 2 ? 0 : 1 ;
+
+    $num = ($out[0] - $out[1]) - ($out[2] - $out[3]) ; 
+    my $title = $num ? 1 : 0 ;
+
+    $w->{$wid}->{border} = $border ;
+    $w->{$wid}->{title}  = $title  ;
+
+    debug("update_title_and_border : title = $title, border = $border", 1) ;
+}
+
+sub update_window {
+
+    my ($module, $event) = @_ ;
+
+    ##  Fetch window event info.
+    my $wid = $event->args->{win_id} ;
+    my $xx = $event->args->{frame_x} ;
+    my $yy = $event->args->{frame_y} ;
+    my $ww = $event->args->{frame_width} ;
+    my $hh = $event->args->{frame_height} ;
+
+    add_new_window(@_) unless defined $w->{$wid} ;
+
+    my $max = $w->{$wid}->{max_mode} ;
+    my $iconic = $w->{$wid}->{iconic} ;
+    my $name = $w->{$wid}->{win_name} ;
+
+    return 0 if $iconic ;
+
+    ## my $vv = $name ? "$name" : "-----" ;
+    ## debug("$wid : MNI $max$iconic : $xx,$yy : $ww,$hh : $vv ", 0) ;
+
+    ##  Store size and coords for normal mode.
+    if ( not $max ) {
+        $w->{$wid}->{xpos} = $xx ; 
+        $w->{$wid}->{ypos} = $yy ; 
+        $w->{$wid}->{ww} = $ww ; 
+        $w->{$wid}->{hh} = $hh ; 
+    }
+}
+
+sub add_res_class {
+    my ($module, $event) = @_ ;
+    my $wid = $event->args->{win_id} ; 
+    return 0 if not defined $w->{$wid} ;
+    $w->{$wid}->{res_class} = $event->args->{name} ; 
+    debug("$wid : res_class  : ".$w->{$wid}->{res_class}, 1) ; 
+}
+
+##  MORE TO DO HERE
+
+sub add_mini_icon {
+    my ($module, $event) = @_ ;
+    my $wid = $event->args->{win_id} ; 
+    return 0 if not defined $w->{$wid} ;
+    my $mini = "$miniicon_dir/" . $event->args->{name} ;
+    unless (-r $mini)  {
+        debug("$wid : mini_icon not found : ".$mini, 0) ; 
+        return 0 ;
+    } 
+    $w->{$wid}->{mini_icon} = $mini ; 
+    debug("$wid : mini_icon  : ".$w->{$wid}->{mini_icon}, 0) ; 
+}
+
+sub add_win_name {
+    my ($module, $event) = @_ ;
+    my $wid = $event->args->{win_id} ; 
+    return 0 if not defined $w->{$wid} ;
+    $w->{$wid}->{win_name} = $event->args->{name} ; 
+    debug("$wid : win_name  : ".$w->{$wid}->{win_name}, 1) ; 
+}
+
+##  Set initial values of a new window record. Some values are 
+##  defaults, others are from the FVWM::Event object.
+
+sub add_new_window {
+    my ($module, $event) = @_ ;
+    my %v = %{ $event->args } ; 
+    my $wid = $v{win_id} ;
+
+    my %u = (
+        title => 1, border => 1, max_mode => 0, iconic => 0,
+        xpos => $v{frame_x}, ypos => $v{frame_y},
+        ww => $v{frame_width}, hh => $v{frame_height},
+        resize_inc_w => $v{resize_width_inc},
+        resize_inc_h => $v{resize_height_inc}, 
+        mini_icon => undef, res_class => undef,
+    ) ;
+
+    ##  Store initial values to window record hashref $w
+    $w->{$wid} = \%u ; 
+
+    debug("Add window: $wid", 0) ;
+    debug("resize_w : $wid : ".$w->{$wid}->{resize_inc_w}, 1) ;
+    debug("resize_h : $wid : ".$w->{$wid}->{resize_inc_h}, 1) ;
+}
+
+sub delete_window {
+    my ($module, $event) = @_ ;
+    my $wid = $event->args->{win_id} ; 
+    return unless exists $w->{$wid} ;
+    foreach my $x (keys %{ $w->{$wid} }) {
+        delete $w->{$wid}->{$x} 
+    } 
+#    dump $w->{$wid} ;
+    delete $w->{$wid} ;
+    debug("Delete window: $wid", 1) ;
+}
+
+sub dump_window_info { dump $w }
+
+sub addcmd  { push @cmds, $_[0] } ;
+
+sub sendcmds {
+    my $wid = shift ;
+    foreach (@cmds) { $module->send($_, $wid) } ;
+    @cmds = () ;
+}
+
+sub debug {
+    my ($msg, $level) = @_ ;
+    $level = 0 if not defined $level ;
+    $module->debug($msg, $level) ;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##  Discard ??
+##  Mask => M_CONFIG_INFO | M_END_CONFIG_INFO | M_STRING | M_ADD_WINDOW | M_CONFIGURE_WINDOW | M_DESTROY_WINDOW | M_RES_CLASS | M_WINDOW_NAME,
+
+###  IS THIS THE SAME AS DEICONIFY
+###  WHY IS THIS HERE. WHAT IS ITS REASON FOR BEING ???
+##   Functions : WindowListFunc + DeIconifyX
+###  Replace restore_mode() with deiconify_window() instead.
+
+##  sub restore_mode {
+##  
+##      my $wid = shift ;
+##      $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+##      my $max = $w->{$wid}->{max_mode}   ; 
+##      my $iconic = $w->{$wid}->{iconic} ;
+##  
+##      debug("restore_mode : max = $max, iconic = $iconic", 0) ;
+##  
+##      deiconify_window($wid) if $iconic ;
+##  
+##      if  ($max) { full_mode($wid)   
+##      } else     { normal_mode($wid) }
+##  
+##      debug("restore_mode : finished : $wid", 0) ;
+##  }
+
+
+##  sub near_mode  {
+##  
+##      return 0 if @_ != 1 ;
+##      my $wid = shift ;
+##      $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+##      my @cmds = () ;
+##  
+##      $module->debug("near_mode : start : $wid", 0) ;
+##      #dump $w->{$wid} ;
+##  
+##      ##  Fetch extra info for this window.
+##      my %u = %{ $w->{$wid} } ; 
+##      my ($max, $near) = @u{"max_mode", "near_mode"} ;
+##      my ($iconic, $title, $border) = @u{"iconic", "title", "border"} ;
+##      my ($xx, $yy, $ww, $hh) = @u{"near_x", "near_y", "near_w", "near_h"} ;
+##  
+##      deiconify_window($wid) if $iconic ;
+##  
+##      ##  Reset windowstyles for nearmax mode.
+##      my $stub1 = "ThisWindow WindowStyle" ;
+##      push @cmds, "$stub1 Maximizable, VariableSize" ;
+##      push @cmds, "$stub1 VariablePosition, NoResizeOverride " ;
+##      push @cmds, "UpdateStyles" ;
+##  
+##      ##  Restore title and border, but only if previous mode is fullmax.
+##      if ( $max and not $near ) {
+##          push @cmds, "$stub1  Title" if $title ;
+##          push @cmds, "$stub1 !Title" if not $title ;
+##          push @cmds, "$stub1  Borders" if $border ;
+##          push @cmds, "$stub1 !Borders" if not $border ;
+##       }
+##  
+##      ##  Restore window geometry, if mode is already in nearmax.
+##      if ( $near ) {
+##          push @cmds, "ThisWindow ResizeMaximize frame ${ww}p ${hh}p" ;
+##          push @cmds, "ThisWindow Move ${xx}p ${yy}p" ;
+##      } else {
+##          push @cmds, "ThisWindow ResizeMaximize frame 98 95" ;
+##          push @cmds, "ThisWindow Move 50-50w 50-50w " ;
+##      }
+##  
+##      push @cmds, "FlipFocus NoWarp" ;
+##      push @cmds, "Raise" ;
+##  
+##      ##  Set window mode to nearmax.
+##      $w->{$wid}->{"near_mode"} = $w->{$wid}->{"max_mode"} = 1 ;
+##  
+##      ##  Run the stored FVWM commands.
+##      foreach (@cmds) { $module->send($_, $wid) } ; 
+##  
+##      $module->debug("near_mode : stop", 1) ;
+##  }
+
+
+
+
+##  $module->add_handler(M_STRING, sub {
+##      my ($module, $event) = @_ ;
+##      my ($cmd, @args) = get_tokens($event->_text) ;
+##  
+##      normal_mode(@args) if $cmd eq "normal_mode" ;
+##      full_mode(@args) if $cmd eq "full_mode" ;
+##      iconic_mode(@args) if $cmd eq "iconic_mode" ;
+##      restore_mode(@args) if $cmd eq "restore_mode" ;
+##      zoom_window(@args) if $cmd eq "zoom_window" ;
+##      toggle_max(@args) if $cmd eq "toggle_max" ;
+##      deiconify_window(@args) if $cmd eq "deiconify_window" ;
+##      dump_window_info() if $cmd eq "dump" ;
+##  #    near_mode(@args) if $cmd eq "near_mode" ;
+##  });
+
+
+##    $w->{$wid}->{"max_mode"} = $w->{$wid}->{"near_mode"} = 0 ;
+##    $w->{$wid}->{"title"} = $w->{$wid}->{"border"} = 1 ;
+##    $w->{$wid}->{"near_x"} = $v{"frame_x"} ; 
+##    $w->{$wid}->{"near_y"} = $v{"frame_y"} ; 
+##    $w->{$wid}->{"near_w"} = $v{"frame_width"} ; 
+##    $w->{$wid}->{"near_h"} = $v{"frame_height"} ; 
+##    $w->{$wid}->{"xpos"} = $event->args->{"frame_x"} ; 
+##    $w->{$wid}->{"ypos"} = $event->args->{"frame_y"} ; 
+##    $w->{$wid}->{"ww"} = $event->args->{"frame_width"} ; 
+##    $w->{$wid}->{"hh"} = $event->args->{"frame_height"} ; 
+##    $w->{$wid}->{"xpos"} = $v{"frame_x"} ; 
+##    $w->{$wid}->{"ypos"} = $v{"frame_y"} ; 
+##    $w->{$wid}->{"ww"} = $v{"frame_width"} ; 
+##    $w->{$wid}->{"hh"} = $v{"frame_height"} ; 
+##    $w->{$wid}->{"resize_inc_w"} = $v{"resize_width_inc"} ; 
+##    $w->{$wid}->{"resize_inc_h"} = $v{"resize_height_inc"} ; 
+##    $w->{$wid}->{"keep_centered"} = 0 ;
+##    $w->{$wid}->{"center_mutex"}  = 0 ;
+##    $w->{$wid}->{"iconic"} = 0 ;
+##    $w->{$wid}->{"ctr_x"}  = $w->{$wid}->{"ctr_y"} = 0 ;
+
+##  sub add_new_window {
+##      my ($module, $event) = @_ ;
+##      my $wid = $event->args->{"win_id"} ;
+##  
+##      my %v = %{ $event->args } ; 
+##  
+##      $w->{$wid}->{"max_mode"} = $w->{$wid}->{"near_mode"} = 0 ;
+##      $w->{$wid}->{"title"} = $w->{$wid}->{"border"} = 1 ;
+##      $w->{$wid}->{"near_x"} = $v{"frame_x"} ; 
+##      $w->{$wid}->{"near_y"} = $v{"frame_y"} ; 
+##      $w->{$wid}->{"near_w"} = $v{"frame_width"} ; 
+##      $w->{$wid}->{"near_h"} = $v{"frame_height"} ; 
+##  ##    $w->{$wid}->{"xpos"} = $event->args->{"frame_x"} ; 
+##  ##    $w->{$wid}->{"ypos"} = $event->args->{"frame_y"} ; 
+##  ##    $w->{$wid}->{"ww"} = $event->args->{"frame_width"} ; 
+##  ##    $w->{$wid}->{"hh"} = $event->args->{"frame_height"} ; 
+##      $w->{$wid}->{"xpos"} = $v{"frame_x"} ; 
+##      $w->{$wid}->{"ypos"} = $v{"frame_y"} ; 
+##      $w->{$wid}->{"ww"} = $v{"frame_width"} ; 
+##      $w->{$wid}->{"hh"} = $v{"frame_height"} ; 
+##      $w->{$wid}->{"resize_inc_w"} = $v{"resize_width_inc"} ; 
+##      $w->{$wid}->{"resize_inc_h"} = $v{"resize_height_inc"} ; 
+##      $w->{$wid}->{"keep_centered"} = 0 ;
+##      $w->{$wid}->{"center_mutex"}  = 0 ;
+##      $w->{$wid}->{"iconic"} = 0 ;
+##      $w->{$wid}->{"ctr_x"}  = $w->{$wid}->{"ctr_y"} = 0 ;
+##  
+##      $module->debug("Add window: $wid", 1) ;
+##      $module->debug("resize_w : $wid : ".$w->{$wid}->{"resize_inc_w"}, 1) ;
+##      $module->debug("resize_h : $wid : ".$w->{$wid}->{"resize_inc_h"}, 1) ;
+##  }
+
+
+
+##  [test5.pl]: got M_WINDOW_NAME [Trcli]
+##  [test5.pl]: got M_ICON_NAME [Trcli]
+##  [test5.pl]: got M_VISIBLE_NAME [Trcli]
+##  [test5.pl]: got MX_VISIBLE_ICON_NAME [Trcli]
+
+
+#  sub update_resource_class {
+#      my ($module, $event) = @_ ;
+#      my $wid = $event->args->{"win_id"} ;
+#      $w->{$wid}->{"res_class"} = $event->args->{"name"} ; 
+#  }
+
+
+#    ##  Recieves info about title and border status of window.
+#    if ($cmd eq "title_and_border") {
+#        my ($wid, $tit, $bord) = @args ;
+#        $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+#        $w->{$wid}->{"title"} = $tit ;
+#        $w->{$wid}->{"border"} = $bord ;
+#        $module->debug("$wid : title_and_border : $tit,$bord", 0) ; 
+#    }
+
+
+
+#  ##  To move window relative to its current position.
+#  sub move_window  {
+#  
+#      $module->debug("move_window : test", 1) ;
+#  
+#      my ($wid, $x, $y) = @_ ;
+#      $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+#      my @cmds = () ;
+#  
+#      $module->debug("move_window : start : $wid", 1) ;
+#  
+#      ##  Fetch extra info for this window.
+#      my $max  = $w->{$wid}->{"max_mode"}  ; 
+#      my $near = $w->{$wid}->{"near_mode"} ;
+#      my $res_class = $w->{$wid}->{"res_class"} ;
+#      my $iconic = $w->{$wid}->{"iconic"} ;
+#  
+#      my $xinc = $res_class =~ /xvt/ ? $w->{$wid}->{"resize_inc_w"} : 8 ;
+#      my $yinc = $res_class =~ /xvt/ ? $w->{$wid}->{"resize_inc_h"} : 8 ;
+#  
+#      return 0 if $iconic ;
+#      return 0 if $max and not $near ;
+#  
+#      my $xx = $max ? $w->{$wid}->{"near_x"} : $w->{$wid}->{"xpos"} ;
+#      my $yy = $max ? $w->{$wid}->{"near_y"} : $w->{$wid}->{"ypos"} ; 
+#      my $ww = $max ? $w->{$wid}->{"near_w"} : $w->{$wid}->{"ww"} ;
+#      my $hh = $max ? $w->{$wid}->{"near_h"} : $w->{$wid}->{"hh"} ;
+#  
+#      my $xarg = my $yarg = "" ;
+#      if ( $res_class =~ /xvt/ )  {
+#          $xarg = $x == 0 ? "keep"  : "w+${x}c" ;
+#          $yarg = $y == 0 ? "keep"  : "w+${y}c" ;
+#      } else {
+#          $xarg = $x == 0 ? "keep" : "w+" . ($x*$xinc) . "p" ;
+#          $yarg = $y == 0 ? "keep" : "w+" . ($y*$yinc) . "p" ;
+#      }
+#       
+#      $module->send("ThisWindow Move $xarg $yarg", $wid) ;
+#      $module->debug("move_window : Move $xarg $yarg", 1) ;
+#  }
+
+
+#  sub resize_window  {
+#  
+#      my ($wid, $dir, $cursor) = @_ ;
+#      $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+#      my @cmds = () ;
+#  
+#      $module->debug("resize_window : start : $wid", 1) ;
+#  
+#      ##  Return if window is fullmax or iconic.
+#      my $max    = $w->{$wid}->{"max_mode"}  ; 
+#      my $near   = $w->{$wid}->{"near_mode"} ;
+#      my $iconic = $w->{$wid}->{"iconic"} ;
+#  
+#      return 0 if $iconic ;
+#      return 0 if $max and not $near ;
+#  
+#      my $stub = "direction $dir warptoborder" ;
+#      push @cmds, "CursorStyle RESIZE $cursor" ;
+#      push @cmds, "ThisWindow  WarpToWindow 50 50" ;
+#      push @cmds, "ThisWindow  Resize $stub" if not $max ;
+#      push @cmds, "ThisWindow  ResizeMaximize $stub" if $max ;
+#      push @cmds, "ThisWindow  WarpToWindow 50 50" ;
+#      $module->debug("resize_window : Resize $stub", 1) ;
+#  
+#      ##  Run the stored FVWM commands.
+#      foreach (@cmds) { $module->send($_, $wid) } ; 
+#  }
+#  
+
+##  keep_centered is not used now
+
+##    ##  If window is flagged as keep_centered, then
+##    ##  recenter it as expected.
+##
+##    if ( $centered and $max and $near or 
+##         $centered and not $max ) {
+##
+##        ##  Reset the mutex
+##        $w->{$wid}->{"center_mutex"} = 0 ;
+##
+##         # Stored center position
+##        my $centx = $w->{$wid}->{"ctr_x"} ;
+##        my $centy = $w->{$wid}->{"ctr_y"} ;
+##
+##        #  Apparent center position.
+##        my $ctx  = int($xx + $ww/2 + .5) ;
+##        my $cty  = int($yy + $hh/2 + .5) ;
+##
+##        ##  Calc the delta.
+##        my $difx = $centx - $ctx ;
+##        my $dify = $centy - $cty  ;
+##
+##        ##  Using "2" as the centering limit
+##        if (abs($difx) > 2 or abs($dify) > 2) {
+##
+##            my $argx = int($xx + $difx + .5 )."p" ;
+##            my $argy = int($yy + $dify + .5 )."p" ;
+##            $argx = "keep" if abs($difx) <= 2 ;
+##            $argy = "keep" if abs($dify) <= 2 ;
+##
+##            $module->send("Move $argx $argy ewmhiwa", $wid) ; 
+##            $module->debug("$wid Re-Center : Move $argx $argy", 1) ;
+##        }
+##    }  
+
+
+#            $module->debug("$wid Re-Center : $centx $centy : $ctx $cty : $xx $yy : $ww $hh : ".int($difx)." ".int($dify)." : $argx $argy", 0) ;
+
+##  Not now used. But useful as an example of code.
+
+##  sub hold_center {
+##  
+##      return 0 if @_ != 2 ;
+##      my ($wid, $secs) = @_ ;
+##      $wid = hex($wid) if $wid =~ /^0x/ ;  ##  Convert hex to int
+##  
+##      ##  Fetch extra info for this window.
+##      my $max = $w->{$wid}->{"max_mode"} ; 
+##      my $near = $w->{$wid}->{"near_mode"} ;
+##      my $iconic = $w->{$wid}->{"iconic"} ;
+##      my $job = $w->{$wid}->{"keep_centered"} ;
+##      my $mutex = $w->{$wid}->{"center_mutex"} ;
+##  
+##      return 0 if $iconic ;
+##      return 0 if $max and not $near ;
+##  
+##      my $xx = $max ? $w->{$wid}->{"near_x"} : $w->{$wid}->{"xpos"} ;
+##      my $yy = $max ? $w->{$wid}->{"near_y"} : $w->{$wid}->{"ypos"} ; 
+##      my $ww = $max ? $w->{$wid}->{"near_w"} : $w->{$wid}->{"ww"} ;
+##      my $hh = $max ? $w->{$wid}->{"near_h"} : $w->{$wid}->{"hh"} ;
+##  
+##      ##  Store the current center position.
+##      if (not $job) {
+##          my $bob = int( $xx + $ww/2 + .5) ;
+##          my $jane = int( $yy + $hh/2 + .5) ;
+##          $module->debug("Storing Center : $bob, $jane", 0) ;
+##          $w->{$wid}->{"ctr_x"} = $bob ;
+##          $w->{$wid}->{"ctr_y"} = $jane ;
+##      }
+##  
+##      ##  Clear any previous scheduled jobs, as set below.
+##      if ($job) {
+##          $scheduler->deschedule($job) ;
+##          $module->debug("Deschedule : $job", 1) ;
+##      }
+##  
+##      ##  Clear the "keep_centered" flag after 1 second.
+##      $w->{$wid}->{"keep_centered"} = $scheduler->schedule( $secs, sub { 
+##          my ($data, $wid) = @_ ;
+##          $w->{$wid}->{"keep_centered"} = 0 ;
+##          $module->debug("$wid keep_centered == 0", 1) ;
+##      },  $wid ) ;
+##  }
+
+##        if ( ref($x) ) {
+##            foreach (keys %{ $w->{$wid}->{$x} }) {
+##                delete $w->{$wid}->{$x}->{$_}
+##            } 
+##        }
+
+# vim: set nospell:ft=fvwm:

@@ -1,0 +1,100 @@
+
+DestroyStyle Cpu
+Style Cpu StartsOnDesk 1, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Cpu PositionPlacement 20p 20p, InitialMapCommand Move 20p 20p
+Style Cpu !Button 1, !Button 2, !Button 4, !Button 6
+
+DestroyStyle Memory
+Style Memory StartsOnDesk 1, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Memory PositionPlacement 20p 166p, InitialMapCommand Move 20p 166p
+Style Memory !Button 1, !Button 2, !Button 4, !Button 6
+
+DestroyStyle Disk
+Style Disk StartsOnDesk 1, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Disk PositionPlacement 20p 312p, InitialMapCommand Move 20p 312p
+Style Disk !Button 1, !Button 2, !Button 4, !Button 6
+
+DestroyStyle Network
+Style Network StartsOnDesk 1, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Network PositionPlacement 20p 458p, InitialMapCommand Move 20p 458p
+Style Network !Button 1, !Button 2, !Button 4, !Button 6
+
+DestroyStyle Celcius
+Style Celcius StartsOnDesk 1, StaysOnBottom, WindowListSkip, NeverFocus, TitleAtLeft
+Style Celcius PositionPlacement 20p 603p, InitialMapCommand Move 20p 603p
+Style Celcius !Button 1, !Button 2, !Button 4, !Button 6
+
+DestroyModuleConfig cpu: *
+DestroyModuleConfig Cpu: *
+*Cpu: Geometry 250x111
+*Cpu: Columns 250
+*Cpu: Rows 111
+*Cpu: Padding 0 0
+*Cpu: BoxSize fixed
+*Cpu: Frame 0
+*Cpu: Pixmap term-tile.png
+*Cpu: (250x148, Id pic1, Icon plot1.png )
+
+DestroyModuleConfig Memory: *
+*Memory: Geometry 250x111
+*Memory: Columns 250
+*Memory: Rows 111
+*Memory: Padding 0 0
+*Memory: BoxSize fixed
+*Memory: Frame 0
+*Memory: Pixmap term-tile.png
+*Memory: (250x148, Id pic2, Icon plot2.png )
+
+DestroyModuleConfig Disk: *
+*Disk: Geometry 250x111
+*Disk: Columns 250
+*Disk: Rows 111
+*Disk: Padding 0 0
+*Disk: BoxSize fixed
+*Disk: Frame 0
+*Disk: Pixmap term-tile.png
+*Disk: (250x148, Id pic3, Icon plot3.png )
+
+DestroyModuleConfig Network: *
+*Network: Geometry 250x111
+*Network: Columns 250
+*Network: Rows 111
+*Network: Padding 0 0
+*Network: BoxSize fixed
+*Network: Frame 0
+*Network: Pixmap term-tile.png
+*Network: (250x148, Id pic4, Icon plot4.png )
+
+DestroyModuleConfig Celcius: *
+*Celcius: Geometry 250x111
+*Celcius: Columns 250
+*Celcius: Rows 111
+*Celcius: Padding 0 0
+*Celcius: BoxSize fixed
+*Celcius: Frame 0
+*Celcius: Pixmap term-tile.png
+*Celcius: (250x148, Id pic5, Icon plot5.png )
+
+DestroyFunc UpdateGraphs
+AddToFunc   UpdateGraphs
++ I SendToModule Cpu ChangeButton pic1 Icon plot1.png
++ I Schedule 200 SendToModule Memory ChangeButton pic2 Icon plot2.png
++ I Schedule 400 SendToModule Disk ChangeButton pic3 Icon plot3.png
++ I Schedule 600 SendToModule Network ChangeButton pic4 Icon plot4.png
++ I Schedule 800 SendToModule Celcius ChangeButton pic5 Icon plot5.png
+
+Exec pkill start_graphs.pl
+KillModule FvwmButtons Cpu
+KillModule FvwmButtons Memory
+KillModule FvwmButtons Disk
+KillModule FvwmButtons Network
+KillModule FvwmButtons Celcius
+
+Schedule 500 Exec exec $[FVWM_USERDIR]/bin/start_graphs.pl
+Schedule 1500 Module FvwmButtons Cpu
+Schedule 1500 Module FvwmButtons Memory
+Schedule 1500 Module FvwmButtons Disk
+Schedule 1500 Module FvwmButtons Network
+Schedule 1500 Module FvwmButtons Celcius
+
+

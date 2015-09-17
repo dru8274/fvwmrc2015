@@ -1,0 +1,21 @@
+
+DestroyModuleConfig NoTopLayer: *
+*NoTopLayer: Cmd Function
+*NoTopLayer: configure_window NotOnTop
+
+DestroyFunc NotOnTop
+AddToFunc NotOnTop
++ I All (Maximized, CurrentPage) ThisWindow ("mplayer2") Layer 0 4
+
+Module FvwmEvent NoTopLayer
+
+
+# Mplayer Fullscreen Problem http://www.fvwmforums.org/phpBB3/viewtopic.php?f=6&t=241
+#Style mplayer2 StaysPut
+# Schedule 10000 All ("*player*") Module FvwmIdent
+# Style mplayer2 Layer 0 4, StaysPut    should work but doesn't
+
+
+
+
+

@@ -1,0 +1,50 @@
+##  ┌─────────────────────────────────────────────────────────────────┐
+##  │  Module : FvwmPerl                                              │
+##  │                                                                 │
+##  │    Used to run perl functions through the PerlEval function.    │
+##  │    Preloaded with perl modules that contain functions for       │
+##  │    notification, clipboard management etc.                      │
+##  │                                                                 │
+##  │    Starting early such that perl preprocessing can              │
+##  │    be used in the main config.                                         │
+##  │                                                                 │
+##  └─────────────────────────────────────────────────────────────────┘
+
+Echo ":: StartPearlModule"
+
+##  To preprocess subconfig files.
+DestroyFunc PreProcess
+AddToFunc   PreProcess I SendToModule FvwmPearl preprocess -- $*
+
+##  Use different quote chars to prevent conflicts.
+DestroyFunc .
+AddToFunc   .  I SendToModule FvwmPearl preprocess -q <> -c -- $*
+
+DestroyFunc ::
+AddToFunc   :: I SendToModule FvwmPearl eval $*
+
+KillModule FvwmPerl FvwmPearl
+ModuleSynchronous FvwmPerl FvwmPearl --export PerlEval
+
+##  DestroyFunc StartPearlModule
+##  AddToFunc StartPearlModule
+##  + I KillModule FvwmPerl FvwmPearl
+##  + I ModuleSynchronous FvwmPerl FvwmPearl --export PerlEval
+##  + I :: use lib "$[FVWM_USERDIR]" ;
+##  + I :: use MyPerl::Notify ;
+#+ I :: use lib `fvwm-perllib dir` ;
+#+ I :: use MyPerl::Clipboard ;
+#+ I :: use Data::Dump qw( dump ) ;
+
+
+
+
+
+
+
+
+
+
+
+
+

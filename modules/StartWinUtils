@@ -1,0 +1,14 @@
+
+DestroyModuleConfig WinUtils: *
+*WinUtils: ThumbIconWidth 205
+*WinUtils: ThumbIconHeight 120
+*WinUtils: MiniIconPadding 10
+*WinUtils: MiniIconBackgroundColor grey15
+*WinUtils: MiniIconBorderWidth 4
+#WinUtils: MiniIconBorderColor '\#2A5E8B'
+*WinUtils: MiniIconBorderColor SteelBlue4
+#*WinUtils: MiniIconBorderColor 'rgb(54,100,139)'
+*WinUtils: MiniIconFolder $[FVWM_USERDIR]/images/mini-icons
+
+KillModule WinUtils
+Module WinUtils

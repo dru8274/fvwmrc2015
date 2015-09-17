@@ -1,0 +1,93 @@
+
+#Echo PreProcess Trackfocus %{ 1 + 2 + 8 }%
+Echo Read Trackfocus
+
+##  ┌─────────────────────────────────────────────────────────────────┐
+##  │  FvwmEvent Module : TrackFocus                                  │
+##  │                                                                 │
+##  │    Keeps track of the last focused window for each desktop      │
+##  │    and ensures it is correctly focused whenever the desktop     │
+##  │    is switched. A newly opened window automatically becomes     │
+##  │    the last focused window for its desktop.                     │
+##  │                                                                 │
+##  │                   Uses States 2 + 3                             │
+##  │                                                                 │
+##  └─────────────────────────────────────────────────────────────────┘
+
+##  An FvwmEvent module that detects changes in desktop
+##  or new windows, and runs the functions defined below.
+
+AddToFunc StartFunction I Module FvwmEvent TrackFocus
+
+DestroyModuleConfig TrackFocus: *
+*TrackFocus: Cmd Function
+*TrackFocus: new_desk FocusRefresh
+*TrackFocus: iconify FocusRefresh
+*TrackFocus: destroy_window FocusRefresh
+*TrackFocus: focus_change MarkActiveWindow
+*TrackFocus: add_window FocusNewWindow
+
+
+##  STATES
+##
+##  States 2 & 3 are used to label newly-added windows & last-focused windows.
+##  State 2 - True for the last focused window on its desktop.
+##  State 3 - Made True for any newly added windows.
+##  Windows that are Iconic or wont AcceptsFocus are ignored.
+
+
+##  This function is run when a new window is added.
+
+DestroyFunc FocusNewWindow
+AddToFunc   FocusNewWindow
++ I ThisWindow (CurrentDesk ) Break
++ I ThisWindow (AcceptsFocus) Raise
++ I ThisWindow (AcceptsFocus) State 3 True
++ I ThisWindow (AcceptsFocus) FlipFocus NoWarp
++ I FocusRefresh
+##  ^^^^^^^^^^^<-- A new window that opens on another desktop can cause the
+##                 current window on the current desktop to loose focus. So
+##                 FocusRefresh is always called to ensure that the correct
+##                 window is still focused.
+
+
+##  If the user switches desktop, there may be no focused window. But if a
+##  "new window" (state 3) exists, then the Next "new window" is focused.
+##  Elsewise, if a "last focused" window (state 2) exists, then that window
+##  is focused. Elsewise the Next found window is focused. Lastly, if no
+##  focusable windows are found, then do nothing.
+
+
+##  This function runs when the desktop switches, or when a window
+##  is destroyed. The Flipfocus cmds trigger implicit calls to
+##  MarkActiveWindow through FvwmEvent.
+
+DestroyFunc FocusRefresh
+AddToFunc FocusRefresh
++ I Next ( CurrentDesk, State 3 ) FlipFocus NoWarp
++ I TestRc (Match) Break
++ I Next ( CurrentDesk, State 2 ) FlipFocus NoWarp
++ I TestRc (Match) Break
++ I Prev ( CurrentDesk, Focused, !Iconic ) FlipFocus NoWarp
++ I TestRc (Match) Break
++ I Prev ( CurrentDesk, !Focused, !Iconic, !FvwmButtons, !stalonetray ) FlipFocus NoWarp                             # CHANGE
++ I TestRc (Match) Break
+
+
+##  If the Current window is Iconic, then do nothing. Elsewise, set all
+##  unfocused windows on the current desktop are state 2 = False. Except
+##  for the currently focused window, which is set to state 2 = True.
+
+##  Ignore programs like stalonetray + fvwmbuttons that may hog the focus.
+
+
+##  This function is run whenever window focus changes. It uses
+##  "states" to label the last-focused window on each desktop.
+
+DestroyFunc MarkActiveWindow
+AddToFunc MarkActiveWindow
++ I Current (!Iconic, CurrentDesk) All (CurrentDesk, !Focused) State 2 False
++ I Current (!Iconic, CurrentDesk) All (CurrentDesk) State 3 False
++ I Current (!Iconic, CurrentDesk) State 2 True
++ I All ( "FButtonsTray|FvwmButtons|stalonetray" ) State 2 False
+
